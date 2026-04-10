@@ -1,9 +1,10 @@
 import { pgTable, serial, integer, text, pgEnum, timestamp, index } from 'drizzle-orm/pg-core';
 import { user } from './auth.schema';
-import { LANGUAGES, ROLES } from '$lib/constants';
+import { LANGUAGES, MESSAGE_STATUS, ROLES } from '$lib/constants';
 
 export const languageEnum = pgEnum('language', LANGUAGES);
 export const messageRoleEnum = pgEnum('message_role', ROLES);
+export const messageStatusEnum = pgEnum('message_status', MESSAGE_STATUS);
 
 export const userProfile = pgTable('user_profile', {
 	userId: text('user_id')
@@ -25,6 +26,7 @@ export const chat = pgTable(
 			.references(() => user.id, { onDelete: 'cascade' })
 			.notNull(),
 		targetLanguage: languageEnum('target_language').notNull(),
+		title: text('title').notNull(),
 		createdAt: timestamp('created_at').defaultNow().notNull(),
 		updatedAt: timestamp('updated_at')
 			.defaultNow()
@@ -41,8 +43,9 @@ export const message = pgTable(
 		chatId: integer('chat_id')
 			.references(() => chat.id, { onDelete: 'cascade' })
 			.notNull(),
-		role: messageRoleEnum('source').notNull(),
+		role: messageRoleEnum('role').notNull(),
 		content: text('content').notNull(),
+		status: messageStatusEnum('status'),
 		createdAt: timestamp('created_at').defaultNow().notNull()
 	},
 	(table) => [index('message_chatid_idx').on(table.chatId)]

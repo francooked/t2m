@@ -5,8 +5,8 @@
 </script>
 
 <form method="post" action="/login?/signOut" class="p-2">
-	<p>Hi, {data.user.name}</p>
-	<button type="submit">Sign Out</button>
+	<p>Hola, {data.user.name}</p>
+	<button type="submit" class="font-medium">Sign Out</button>
 </form>
 
 {@render children?.()}

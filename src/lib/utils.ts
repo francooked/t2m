@@ -13,8 +13,21 @@ export type keysOf<o> = o extends readonly unknown[]
 
 export const keysOf = <o extends object>(o: o) => Object.keys(o) as keysOf<o>[];
 
-const getStringFormValue = (formData: FormData, key: string, defaultValue: string) => {
-	const value = formData.get(key);
-	if (!value || value instanceof File) return defaultValue;
-	return value;
-};
+export function ndjson(data: any) {
+	return JSON.stringify(data) + '\n';
+}
+
+export function parseNdjson<T>(message: string): T[] | null {
+	let output: T[] = [];
+	try {
+		const lines = message.split('\n');
+		for (const line of lines) {
+			if (line.trim() === '') break;
+			const data: T = JSON.parse(line);
+			output.push(data);
+		}
+		return output;
+	} catch {
+		return null;
+	}
+}

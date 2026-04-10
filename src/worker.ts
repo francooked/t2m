@@ -1,0 +1,279 @@
+import { prompts as correctionPrompts } from '$lib/prompts/correction';
+import { prompts as replyPrompts } from '$lib/prompts/reply';
+import { Worker } from 'bullmq';
+import Groq from 'groq-sdk';
+import { createClient } from 'redis';
+import * as schema from '$lib/server/db/schema';
+import * as authSchema from '$lib/server/db/auth.schema';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { eq, and, lt } from 'drizzle-orm';
+import process from 'node:process';
+import { correctionQueue, replyQueue } from './lib/server/db/queues';
+import z from 'zod';
+
+export const replyWorker = new Worker<{ messageId: number; chatId: number }, void>(
+	replyQueue.name,
+	async ({ data: { chatId, messageId } }) => {
+		if (!process.env.GROQ_API_KEY) {
+			console.log('Undefined GROQ_API_KEY environment variable.');
+			return;
+		}
+		if (!process.env.DATABASE_URL) {
+			console.log('Undefined DATABASE_URL environment variable.');
+			return;
+		}
+
+		const redisClient = await createClient({ url: process.env.REDIS_URL }).connect();
+		const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+		const pgClient = postgres(process.env.DATABASE_URL);
+		const db = drizzle(pgClient, { schema: { ...schema, ...authSchema } });
+		const chats = await db
+			.select({
+				nativeLanguage: schema.userProfile.nativeLanguage,
+				targetLanguage: schema.chat.targetLanguage
+			})
+			.from(schema.message)
+			.innerJoin(schema.chat, eq(schema.message.chatId, schema.chat.id))
+			.innerJoin(schema.userProfile, eq(schema.chat.userId, schema.userProfile.userId))
+			.where(and(eq(schema.message.id, messageId), eq(schema.chat.id, chatId)))
+			.limit(1);
+		const messages = await db
+			.select({
+				content: schema.message.content,
+				role: schema.message.role
+			})
+			.from(schema.message)
+			.innerJoin(schema.chat, eq(schema.message.chatId, schema.chat.id))
+			.where(and(lt(schema.message.id, messageId), eq(schema.chat.id, chatId)));
+		const groqStream = await groqClient.chat.completions.create({
+			messages: replyPrompts(
+				messages.map(({ role, content }) => ({ role, content })),
+				{
+					nativeLanguage: chats[0].nativeLanguage,
+					targetLanguage: chats[0].targetLanguage
+				}
+			),
+			model: 'openai/gpt-oss-20b',
+			temperature: 0.5,
+			max_completion_tokens: 4096,
+			top_p: 1,
+			stop: null,
+			stream: true
+		});
+
+		let fullContent: string = '';
+		for await (const chunk of groqStream) {
+			const chunkContent = chunk.choices[0]?.delta?.content || '';
+			redisClient.xAdd(`reply:${messageId}`, '*', { content: chunkContent, done: 'false' });
+			fullContent += chunkContent;
+		}
+		redisClient.xAdd(`reply:${messageId}`, '*', { content: '', done: 'true' });
+
+		await db
+			.update(schema.message)
+			.set({ content: fullContent })
+			.where(eq(schema.message.id, messageId));
+
+		console.log('(reply) job.data:', { chatId, messageId }, 'content:', fullContent);
+	},
+	{
+		connection: { url: process.env.REDIS_URL }
+	}
+)
+	.on('progress', async ({ data: { chatId, messageId } }) => {
+		if (!process.env.DATABASE_URL) {
+			console.log('Undefined DATABASE_URL environment variable.');
+			return;
+		}
+
+		const pgClient = postgres(process.env.DATABASE_URL);
+		const db = drizzle(pgClient, { schema: { ...schema, ...authSchema } });
+		await db
+			.update(schema.message)
+			.set({ status: 'generating' })
+			.where(and(eq(schema.message.id, messageId), eq(schema.message.chatId, chatId)));
+	})
+	.on('completed', async ({ data: { chatId, messageId } }) => {
+		if (!process.env.DATABASE_URL) {
+			console.log('Undefined DATABASE_URL environment variable.');
+			return;
+		}
+
+		const pgClient = postgres(process.env.DATABASE_URL);
+		const db = drizzle(pgClient, { schema: { ...schema, ...authSchema } });
+		await db
+			.update(schema.message)
+			.set({ status: 'complete' })
+			.where(and(eq(schema.message.id, messageId), eq(schema.message.chatId, chatId)));
+	})
+	.on('failed', async (job, error) => {
+		if (!job) {
+			console.log('(reply) Worker failed:', error);
+			return;
+		}
+
+		console.log('(correct) Worker failed:', error);
+
+		if (!process.env.DATABASE_URL) {
+			console.log('Undefined DATABASE_URL environment variable.');
+			return;
+		}
+
+		const {
+			data: { chatId, messageId }
+		} = job;
+
+		const pgClient = postgres(process.env.DATABASE_URL);
+		const db = drizzle(pgClient, { schema: { ...schema, ...authSchema } });
+		await db
+			.update(schema.message)
+			.set({ status: 'failed' })
+			.where(and(eq(schema.message.id, messageId), eq(schema.message.chatId, chatId)));
+	});
+
+export const correctionWorker = new Worker<{ messageId: number; chatId: number }, void>(
+	correctionQueue.name,
+	async ({ data: { chatId, messageId } }) => {
+		if (!process.env.GROQ_API_KEY) {
+			console.log('Undefined GROQ_API_KEY environment variable.');
+			return;
+		}
+		if (!process.env.DATABASE_URL) {
+			console.log('Undefined DATABASE_URL environment variable.');
+			return;
+		}
+
+		const redisClient = await createClient({ url: process.env.REDIS_URL }).connect();
+		const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+		const pgClient = postgres(process.env.DATABASE_URL);
+		const db = drizzle(pgClient, { schema: { ...schema, ...authSchema } });
+		const messages = await db
+			.select({
+				content: schema.message.content,
+				nativeLanguage: schema.userProfile.nativeLanguage,
+				targetLanguage: schema.chat.targetLanguage
+			})
+			.from(schema.message)
+			.innerJoin(schema.chat, eq(schema.message.chatId, schema.chat.id))
+			.innerJoin(schema.userProfile, eq(schema.chat.userId, schema.userProfile.userId))
+			.where(eq(schema.message.id, messageId))
+			.limit(1);
+		const groqStream = await groq.chat.completions.create({
+			messages: correctionPrompts(messages[0].content, {
+				nativeLanguage: messages[0].nativeLanguage,
+				targetLanguage: messages[0].targetLanguage
+			}),
+			model: 'openai/gpt-oss-20b',
+			temperature: 0.5,
+			max_completion_tokens: 4096,
+			top_p: 1,
+			stop: null,
+			stream: true
+		});
+
+		let fullContent: string = '';
+		for await (const chunk of groqStream) {
+			const chunkContent = chunk.choices[0]?.delta?.content || '';
+			redisClient.xAdd(`correct:${messageId}`, '*', { content: chunkContent, done: 'false' });
+			fullContent += chunkContent;
+		}
+		redisClient.xAdd(`correct:${messageId}`, '*', { content: '', done: 'true' });
+
+		const zodSchema = z.array(
+			z.object({
+				fragment: z.string().min(1),
+				reason: z.string().min(1),
+				suggestions: z.array(z.object({ replacement: z.string().min(1) }))
+			})
+		);
+		const { success, data } = zodSchema.safeParse(JSON.parse(fullContent));
+		if (!success) {
+			console.log('Invalid JSON response from LLM.');
+			return;
+		}
+
+		if (data.length > 0) {
+			await db.transaction(async (tx) => {
+				const corrections = await tx
+					.insert(schema.correction)
+					.values(
+						data.map(({ fragment, reason }) => {
+							const start = messages[0].content.indexOf(fragment);
+							const end = start + fragment.length - 1;
+							return {
+								messageId,
+								reason,
+								start,
+								end
+							};
+						})
+					)
+					.returning({ id: schema.correction.id });
+				const suggestions = await tx.insert(schema.suggestion).values(
+					data.flatMap(({ suggestions }, index) => {
+						return suggestions.map(({ replacement }) => ({
+							correctionId: corrections[index].id,
+							replacement
+						}));
+					})
+				);
+			});
+		}
+
+		console.log('(correct) job.data:', { chatId, messageId }, 'correction:', JSON.stringify(data));
+	},
+	{
+		connection: { url: process.env.REDIS_URL }
+	}
+)
+	.on('progress', async ({ data: { chatId, messageId } }) => {
+		if (!process.env.DATABASE_URL) {
+			console.log('Undefined DATABASE_URL environment variable.');
+			return;
+		}
+
+		const pgClient = postgres(process.env.DATABASE_URL);
+		const db = drizzle(pgClient, { schema: { ...schema, ...authSchema } });
+		await db
+			.update(schema.message)
+			.set({ status: 'correcting' })
+			.where(and(eq(schema.message.id, messageId), eq(schema.message.chatId, chatId)));
+	})
+	.on('completed', async ({ data: { chatId, messageId } }) => {
+		if (!process.env.DATABASE_URL) {
+			console.log('Undefined DATABASE_URL environment variable.');
+			return;
+		}
+
+		const pgClient = postgres(process.env.DATABASE_URL);
+		const db = drizzle(pgClient, { schema: { ...schema, ...authSchema } });
+		await db
+			.update(schema.message)
+			.set({ status: 'complete' })
+			.where(and(eq(schema.message.id, messageId), eq(schema.message.chatId, chatId)));
+	})
+	.on('failed', async (job, error) => {
+		if (!job) {
+			console.log('(correct) Worker failed:', error);
+			return;
+		}
+
+		console.log('(correct) Worker failed:', error);
+
+		if (!process.env.DATABASE_URL) {
+			console.log('Undefined DATABASE_URL environment variable.');
+			return;
+		}
+
+		const {
+			data: { chatId, messageId }
+		} = job;
+
+		const pgClient = postgres(process.env.DATABASE_URL);
+		const db = drizzle(pgClient, { schema: { ...schema, ...authSchema } });
+		await db
+			.update(schema.message)
+			.set({ status: 'failed' })
+			.where(and(eq(schema.message.id, messageId), eq(schema.message.chatId, chatId)));
+	});
