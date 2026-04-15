@@ -2,18 +2,30 @@
 	import type { PageProps } from './$types';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from './$types';
-	import type { StreamEvent } from '../../api/stream/reply/+server';
+	import type { StreamEvent } from '$lib/server/stream-events';
 	import { parseNdjson } from '$lib/utils';
+	import { segmentMessageByCorrections } from '$lib/message-tokens';
+	import { invalidateAll } from '$app/navigation';
 
 	const { data, params }: PageProps = $props();
+
+	const messages = $derived(
+		data.messages.map((message) =>
+			message.role === 'assistant'
+				? message
+				: { ...message, tokens: segmentMessageByCorrections(message.content, message.corrections) }
+		)
+	);
+
 	let assistantStream: HTMLSpanElement | null = $state(null);
 
 	$effect(() => {
 		const controller = new AbortController();
+		const lastMessage = data.messages.at(-1);
 		if (
-			data.messages[data.messages.length - 1].role === 'assistant' &&
-			(data.messages[data.messages.length - 1].status === 'pending' ||
-				data.messages[data.messages.length - 1].status === 'generating')
+			lastMessage &&
+			lastMessage.role === 'assistant' &&
+			(lastMessage.status === 'pending' || lastMessage.status === 'generating')
 		) {
 			(async () => {
 				const response = await fetch('/api/stream/reply', {
@@ -56,6 +68,47 @@
 		return () => controller.abort();
 	});
 
+	$effect(() => {
+		const controller = new AbortController();
+		const lastMessage = data.messages.at(-2);
+		if (
+			lastMessage &&
+			lastMessage.role === 'user' &&
+			(lastMessage.status === 'pending' || lastMessage.status === 'correcting')
+		) {
+			(async () => {
+				const response = await fetch('/api/stream/correct', {
+					method: 'post',
+					body: JSON.stringify({ chatId: params.id, messageId: lastMessage.id }),
+					signal: controller.signal
+				});
+				if (!response.body) {
+					console.log('No body.');
+					return;
+				}
+
+				const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+				while (true) {
+					const { value, done } = await reader.read();
+					if (done) {
+						break;
+					}
+					if (!value) {
+						break;
+					}
+
+					const streamEvents = parseNdjson<StreamEvent>(value);
+					if (!streamEvents) break;
+
+					if (streamEvents.some(({ type }) => type === 'done')) break;
+				}
+				await invalidateAll();
+			})();
+		}
+
+		return () => controller.abort();
+	});
+
 	const handleReply: SubmitFunction = async () => {
 		return async ({ result, update }) => {
 			if (result.type === 'success') {
@@ -70,7 +123,7 @@
 
 <div class="p-2">
 	<h1 class="font-bold underline">Mensajes</h1>
-	{#each data.messages as message}
+	{#each messages as message}
 		{#if message.role === 'assistant'}
 			<div>
 				<span class="">Asistente:</span>
@@ -93,7 +146,14 @@
 		{:else}
 			<div>
 				<span class="">Tú:</span>
-				<span>{message.content}</span>
+				{#each message.tokens as token}
+					{#if token.type === 'text'}
+						<span>{token.content}</span>
+					{:else}
+						<span class="text-red-400 line-through">{token.content}</span>
+						<span class="text-green-400">{token.suggestions[0].replacement}</span>
+					{/if}
+				{/each}
 			</div>
 		{/if}
 	{/each}
@@ -102,5 +162,5 @@
 <form method="post" action="?/reply" class="p-2" use:enhance={handleReply}>
 	<textarea placeholder="¿Cuál es tu respuesta?" name="content"></textarea>
 	<button type="submit" class="font-medium">Enviar</button>
-	<input type="hidden" name="chatId" value={params.id} />
+	<input type="hidden" name="chat_id" value={params.id} />
 </form>

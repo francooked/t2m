@@ -10,10 +10,12 @@ import { LANGUAGES } from '$lib/constants';
 import { createClient } from 'redis';
 import { REDIS_URL } from '$env/static/private';
 import { correctionQueue, replyQueue } from '$lib/server/db/queues';
+import { requireUserSession } from '$lib/server/session-user';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	// The session was validated in the +layout.server.ts file.
-	const signedInUser = locals.user as typeof authSchema.user.$inferSelect;
+	const signedInUser = requireUserSession(locals);
+	if (!signedInUser) return redirect(302, '/login');
+
 	const chats = await db
 		.select({ id: schema.chat.id, title: schema.chat.title })
 		.from(schema.chat)
@@ -24,6 +26,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions = {
 	startChat: async ({ request, locals }) => {
+		const signedInUser = requireUserSession(locals);
+		if (!signedInUser) return redirect(302, '/login');
+
 		const formData = await request.formData();
 		const zodSchema = z.object({ content: z.string().min(1), targetLanguage: z.enum(LANGUAGES) });
 		const { success, data } = zodSchema.safeParse({
@@ -33,7 +38,6 @@ export const actions = {
 
 		if (!success) return fail(400, { code: 'invalid_input' });
 
-		const signedInUser = locals.user as typeof authSchema.user.$inferSelect;
 		const redisClient = await createClient({ url: REDIS_URL }).connect();
 
 		const { newChat, newMessages } = await db.transaction(async (tx) => {
@@ -68,13 +72,16 @@ export const actions = {
 		return redirect(303, `/chat/${newChat.id}`);
 	},
 	deleteChat: async ({ request, locals }) => {
+		const signedInUser = requireUserSession(locals);
+		if (!signedInUser) return redirect(302, '/login');
+
 		const formData = await request.formData();
 		const zodSchema = z.object({ chatId: z.number().positive() });
 		const { success, data } = zodSchema.safeParse({
-			chatId: parseInt(formData.get('chatId')?.toString() ?? '-1')
+			chatId: parseInt(formData.get('chat_id')?.toString() ?? '-1')
 		});
 		if (!success) return fail(400, { code: 'invalid_input' });
-		const signedInUser = locals.user as typeof authSchema.user.$inferSelect;
+
 		await db
 			.delete(schema.chat)
 			.where(and(eq(schema.chat.id, data.chatId), eq(schema.chat.userId, signedInUser.id)));

@@ -14,49 +14,59 @@ export type LLMCorrectionResponse = LLMCorrectionItem[];
 // siempre que sean iguales. Si ya involucra verbos auxiliares entremedio, o la frase completa
 // está incorrecta (la frase incluye el error repetido), mejor considerar todo como un gran error.
 export const prompts: PromptFn<
-	string,
+	ChatCompletionMessageParam[],
 	{ nativeLanguage: (typeof LANGUAGES)[number]; targetLanguage: (typeof LANGUAGES)[number] }
-> = (input, options) => [
-	{
-		role: 'system',
-		content: dedent`
+> = (input, options) => {
+	const targetMessage = input.at(-1);
+	if (targetMessage?.role !== 'user') throw new Error('Last message is not a user message.');
+
+	return [
+		{
+			role: 'system',
+			content: dedent`
             Actúa como un corrector gramatical y de estilo.
 
             Contexto:
             - El usuario es hablante nativo de ${options.nativeLanguage}.
             - Está aprendiendo ${options.targetLanguage} y escribe mensajes en ese idioma.
+            - Recibirás una conversación corta (0 a 3 mensajes previos).
+            - Los mensajes pueden tener rol "assistant" o "user".
 
             Tarea:
-            - Detectar errores en el mensaje.
-            - Responder SIEMPRE con un JSON válido.
-            - Retornar un array con una entrada por cada error.
+            - Debes corregir ÚNICAMENTE el mensaje que comienza con "[TARGET]".
+            - Usa los mensajes previos solo como contexto para entender el significado.
+            - No corrijas mensajes anteriores.
 
-            Formato:
+            Formato de respuesta (OBLIGATORIO):
             [
-            {
-                "fragment": string,
-                "reason": string,
-                "suggestions": [
-                { "replacement": string }
-                ]
-            }
+                {
+                    "fragment": string,
+                    "reason": string,
+                    "suggestions": [
+                        { "replacement": string }
+                    ]
+                }
             ]
 
             Reglas:
-            - "fragment": solo el fragmento incorrecto.
-            - "reason": snake_case (grammar_error, spelling_error, unnatural_expression, etc).
-            - "suggestions": una o más alternativas naturales.
+            - "fragment": debe ser el fragmento incorrecto del mensaje marcado con [TARGET]
+            - "reason": código en snake_case (grammar_error, verb_tense_error, wrong_preposition, article_error, spelling_error, unnatural_expression, etc).
+            - "suggestions": una o más alternativas correctas y naturales.
             - No texto fuera del JSON.
             - Si no hay errores: []
 
             Criterios:
-            - Priorizar naturalidad.
+            - Usa el contexto para decidir significado, preposiciones y tiempos verbales.
+            - Prioriza naturalidad sobre literalidad.
             - No sobrecorregir.
+            - No infieras errores si la frase es válida en contexto.
         `
-	} as const,
-	...examples[options.targetLanguage],
-	{ role: 'user', content: input }
-];
+		} as const,
+		...examples[options.targetLanguage],
+		...(input.length > 1 ? input.slice(0, -1) : []),
+		{ role: 'user', content: `[TARGET]\n${targetMessage.content}` }
+	];
+};
 
 const examples: { [K in (typeof LANGUAGES)[number]]: ChatCompletionMessageParam[] } = {
 	en: [
@@ -123,37 +133,68 @@ const examples: { [K in (typeof LANGUAGES)[number]]: ChatCompletionMessageParam[
 		{ role: 'assistant', content: '[]' }
 	],
 	es: [
-		{ role: 'user', content: 'Yo tengo 25 años viejo' },
+		// Example 1
+		{ role: 'assistant', content: '¿A dónde vas ahora?' },
+		{ role: 'user', content: 'Voy en el gimnasio' },
+		{ role: 'assistant', content: '¿A entrenar?' },
+		{ role: 'user', content: '[TARGET]\nVoy en el gimnasio' },
 		{
 			role: 'assistant',
 			content: dedent`
                 [
                     {
-                        "fragment": "viejo",
-                        "reason": "unnatural_expression",
+                        "fragment": "en el gimnasio",
+                        "reason": "wrong_preposition",
                         "suggestions": [
-                        { "replacement": "años" }
+                            { "replacement": "al gimnasio" }
                         ]
                     }
                 ]
             `
 		},
-		{ role: 'user', content: 'Ella es muy simpatico y trabaja en un hospital grande' },
+		// Example 2
+		{ role: 'assistant', content: '¿Cómo está la comida?' },
+		{ role: 'user', content: 'Muy rica' },
+		{ role: 'assistant', content: 'Qué bueno.' },
+		{ role: 'user', content: '[TARGET]\nLa comida es fría' },
 		{
 			role: 'assistant',
 			content: dedent`
-               [
+            [
+                {
+                    "fragment": "es",
+                    "reason": "ser_vs_estar_error",
+                    "suggestions": [
+                        { "replacement": "está" }
+                    ]
+                }
+            ]
+        `
+		},
+		// Example 3
+		{ role: 'assistant', content: '¿Cuántos años tiene tu hermano?' },
+		{ role: 'user', content: 'Tiene 20 años' },
+		{ role: 'assistant', content: 'Ah, es joven.' },
+		{ role: 'user', content: '[TARGET]\nHace 25 años' },
+		{
+			role: 'assistant',
+			content: dedent`
+                [
                     {
-                        "fragment": "simpatico",
-                        "reason": "gender_agreement_error",
+                        "fragment": "Hace 25 años",
+                        "reason": "unnatural_expression",
                         "suggestions": [
-                        { "replacement": "simpática" }
+                            { "replacement": "Tiene 25 años" }
                         ]
                     }
                 ]
             `
 		},
-		{ role: 'user', content: 'Ayer fui al supermercado' },
+		// Example 4
+		{ role: 'assistant', content: '¿Qué hiciste el fin de semana?' },
+		{ role: 'user', content: 'Salí con amigos' },
+		{ role: 'assistant', content: '¿A dónde fueron?' },
+		{ role: 'user', content: '[TARGET]\nFuimos a un bar en el centro' },
 		{ role: 'assistant', content: '[]' }
 	]
 };

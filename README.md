@@ -61,3 +61,9 @@ No puede ser modificado, porque las sugerencias
 que hace el sistema consideran el idioma nativo
 del aprendiz.
 (correo, contraseña hasheada, idioma)
+
+## Casos borde
+
+Considerar <e>...</e> como un error y <s>...</s> como la sugerencia.
+
+No sé, <e>cúales tú recomendarme</e> <s>¿Cuáles me recomendarías?</s>?

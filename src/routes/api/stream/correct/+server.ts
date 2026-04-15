@@ -4,9 +4,9 @@ import { error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { REDIS_URL } from '$env/static/private';
 import { requireUserSession } from '$lib/server/session-user';
 import { createRedisNdjsonStream } from '$lib/server/redis-stream-reader';
+import { REDIS_URL } from '$env/static/private';
 
 const bodySchema = z.object({
 	chatId: z.number().positive(),
@@ -15,7 +15,7 @@ const bodySchema = z.object({
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	const signedInUser = requireUserSession(locals);
-	if (!signedInUser) return error(401, { message: 'Unauthorized.', code: 'unauthorized' });
+	if (!signedInUser) return error(401, { message: 'Unauthorized', code: 'unauthorized' });
 
 	const input = await request.json();
 	const { success, data } = bodySchema.safeParse({
@@ -40,12 +40,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	const readableStream = createRedisNdjsonStream({
 		redisUrl: REDIS_URL,
-		streamKey: `reply:${data.messageId}`,
+		streamKey: `correct:${data.messageId}`,
 		blockMs: 8192,
 		count: 8
 	});
-
 	return new Response(readableStream, {
-		headers: { 'content-type': 'application/x-ndjson', 'cache-control': 'no-cache' }
+		headers: { 'content-type': 'text/application-xndjson', 'cache-control': 'no-cache' }
 	});
 };

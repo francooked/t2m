@@ -34,7 +34,7 @@
 			<a href={`/chat/${chat.id}`} class="font-medium">{chat.title}</a>
 			<form method="post" action="?/deleteChat" class="inline" use:enhance={handleDeleteChat}>
 				<button type="submit" class="font-medium">Eliminar</button>
-				<input type="hidden" name="chatId" value={chat.id} />
+				<input type="hidden" name="chat_id" value={chat.id} />
 			</form>
 		</div>
 	{:else}

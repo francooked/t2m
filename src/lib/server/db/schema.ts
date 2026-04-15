@@ -45,7 +45,7 @@ export const message = pgTable(
 			.notNull(),
 		role: messageRoleEnum('role').notNull(),
 		content: text('content').notNull(),
-		status: messageStatusEnum('status'),
+		status: messageStatusEnum('status').notNull(),
 		createdAt: timestamp('created_at').defaultNow().notNull()
 	},
 	(table) => [index('message_chatid_idx').on(table.chatId)]
