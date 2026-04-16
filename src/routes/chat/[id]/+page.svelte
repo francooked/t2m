@@ -2,12 +2,14 @@
 	import type { PageProps } from './$types';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from './$types';
-	import type { StreamEvent } from '$lib/server/stream-events';
-	import { parseNdjson } from '$lib/utils';
 	import { segmentMessageByCorrections } from '$lib/message-tokens';
-	import { invalidateAll } from '$app/navigation';
+	import { CorrectStreamManager, ReplyStreamManager } from '$lib/stream-manager';
+	import z from 'zod';
 
 	const { data, params }: PageProps = $props();
+
+	const replyStreamManager = new ReplyStreamManager();
+	const correctStreamManager = new CorrectStreamManager();
 
 	const messages = $derived(
 		data.messages.map((message) =>
@@ -17,96 +19,26 @@
 		)
 	);
 
-	let assistantStream: HTMLSpanElement | null = $state(null);
-
 	$effect(() => {
-		const controller = new AbortController();
 		const lastMessage = data.messages.at(-1);
 		if (
 			lastMessage &&
 			lastMessage.role === 'assistant' &&
 			(lastMessage.status === 'pending' || lastMessage.status === 'generating')
 		) {
-			(async () => {
-				const response = await fetch('/api/stream/reply', {
-					method: 'post',
-					body: JSON.stringify({
-						chatId: params.id,
-						messageId: data.messages[data.messages.length - 1].id
-					}),
-					signal: controller.signal
-				});
-				if (!response.body) {
-					console.log('No body.');
-					return;
-				}
-
-				let fullContent = '';
-				const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-				while (true) {
-					const { value, done } = await reader.read();
-					if (done) {
-						break;
-					}
-					if (!value) {
-						break;
-					}
-
-					const streamEvents = parseNdjson<StreamEvent>(value);
-					if (!streamEvents) break;
-
-					for (const streamEvent of streamEvents) {
-						if (streamEvent.type === 'chunk' && streamEvent.content && assistantStream) {
-							fullContent += streamEvent.content;
-							assistantStream.innerHTML = fullContent;
-						}
-					}
-				}
-			})();
+			replyStreamManager.start({ chatId: Number(params.id), messageId: lastMessage.id });
 		}
-
-		return () => controller.abort();
 	});
 
 	$effect(() => {
-		const controller = new AbortController();
 		const lastMessage = data.messages.at(-2);
 		if (
 			lastMessage &&
 			lastMessage.role === 'user' &&
 			(lastMessage.status === 'pending' || lastMessage.status === 'correcting')
 		) {
-			(async () => {
-				const response = await fetch('/api/stream/correct', {
-					method: 'post',
-					body: JSON.stringify({ chatId: params.id, messageId: lastMessage.id }),
-					signal: controller.signal
-				});
-				if (!response.body) {
-					console.log('No body.');
-					return;
-				}
-
-				const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-				while (true) {
-					const { value, done } = await reader.read();
-					if (done) {
-						break;
-					}
-					if (!value) {
-						break;
-					}
-
-					const streamEvents = parseNdjson<StreamEvent>(value);
-					if (!streamEvents) break;
-
-					if (streamEvents.some(({ type }) => type === 'done')) break;
-				}
-				await invalidateAll();
-			})();
+			correctStreamManager.start({ chatId: Number(params.id), messageId: lastMessage.id });
 		}
-
-		return () => controller.abort();
 	});
 
 	const handleReply: SubmitFunction = async () => {
@@ -119,41 +51,87 @@
 			}
 		};
 	};
+
+	const llmJsonToCorrections = (content: string, llmJson: string) => {
+		const zodSchema = z.array(
+			z.object({
+				fragment: z.string().min(1),
+				reason: z.string().min(1),
+				suggestions: z.array(z.object({ replacement: z.string().min(1) }))
+			})
+		);
+		const { success, data } = zodSchema.safeParse(JSON.parse(llmJson));
+		if (!success) {
+			throw new Error('Invalid JSON response from LLM.');
+		}
+		return data.map(({ fragment, reason, suggestions }) => {
+			const start = content.indexOf(fragment);
+			const end = start + fragment.length - 1;
+			return {
+				id: new Date().getDate(),
+				reason,
+				start,
+				end,
+				suggestions
+			};
+		});
+	};
 </script>
 
 <div class="p-2">
 	<h1 class="font-bold underline">Mensajes</h1>
-	{#each messages as message}
+	{#each messages as message (message.id)}
 		{#if message.role === 'assistant'}
 			<div>
 				<span class="">Asistente:</span>
-				<span id="assistant_stream" bind:this={assistantStream}>
+				<span>
 					{#if message.status === 'complete'}
 						{message.content}
 					{:else if message.status === 'failed'}
 						Error al generar la respuesta
 					{:else}
-						Generando el mensaje...
+						{$replyStreamManager.get(message.id)?.content ?? 'Generando el mensaje'}
 					{/if}
 				</span>
 				{#if message.status === 'failed'}
 					<form method="post" action="?/reply">
 						<button type="submit" class="font-medium">Reintenar</button>
-						<input type="hidden" name="chatId" value={params.id} />
+						<input type="hidden" name="chat_id" value={params.id} />
 					</form>
 				{/if}
 			</div>
 		{:else}
 			<div>
 				<span class="">Tú:</span>
-				{#each message.tokens as token}
-					{#if token.type === 'text'}
-						<span>{token.content}</span>
-					{:else}
-						<span class="text-red-400 line-through">{token.content}</span>
-						<span class="text-green-400">{token.suggestions[0].replacement}</span>
-					{/if}
-				{/each}
+				{#if message.status === 'complete'}
+					{#each message.tokens as token}
+						{#if token.type === 'text'}
+							<span>{token.content}</span>
+						{:else}
+							<span class="text-red-400 line-through">{token.content}</span>
+							<span class="text-green-400">{token.suggestions[0].replacement}</span>
+						{/if}
+					{/each}
+				{:else if message.status === 'failed'}
+					(Error) {message.content}
+				{:else if $correctStreamManager.get(message.id)?.status === 'done'}
+					{@const tokens = segmentMessageByCorrections(
+						message.content,
+						llmJsonToCorrections(message.content, $correctStreamManager.get(message.id)!.content)
+					)}
+					{#each tokens as token}
+						{#if token.type === 'text'}
+							<span>{token.content}</span>
+						{:else}
+							<span class="text-red-400 line-through">{token.content}</span>
+							<span class="text-green-400">{token.suggestions[0].replacement}</span>
+						{/if}
+					{/each}
+				{:else if $correctStreamManager.get(message.id)?.status === 'streaming'}
+					(Corrigiendo) {message.content}
+				{:else}
+					{message.content}
+				{/if}
 			</div>
 		{/if}
 	{/each}

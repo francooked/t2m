@@ -64,6 +64,20 @@ del aprendiz.
 
 ## Casos borde
 
-Considerar <e>...</e> como un error y <s>...</s> como la sugerencia.
+Lo que está entre `<e>` y `</e>` es un error y entre `<s>` y `</s>` una sugerencia del LLM.
 
+```
 No sé, <e>cúales tú recomendarme</e> <s>¿Cuáles me recomendarías?</s>?
+```
+
+La sugerencia no debería incluir texto anterior a donde se encuentra el error en sí
+
+```
+Me gusta salir a caminar por calles <e>donde gente caminar no</e><s>Me gusta salir a caminar por calles donde la gente no camina.</s>
+```
+
+La sugerencia no debería incluir texto anterior a donde se encuentra el error en sí
+
+```
+Me gustaría <e>ir salir</e> <s>ir de vacaciones</s> vacaciones
+```
