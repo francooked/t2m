@@ -8,3 +8,6 @@ export const MESSAGE_STATUS = [
 	'complete',
 	'failed'
 ] as const;
+export const EXERCISE_TYPES = ['full_answer'] as const;
+export const SRS_ALGORITHMS = ['fsrs'] as const;
+export const FSRS_RATINGS = ['again', 'hard', 'good', 'easy'] as const;

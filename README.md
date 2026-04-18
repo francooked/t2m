@@ -62,6 +62,82 @@ que hace el sistema consideran el idioma nativo
 del aprendiz.
 (correo, contraseña hasheada, idioma)
 
+---
+
+La idea es que los errores de un usuario se transformen en ejercicios
+Los ejercicios usarán FSRS, un algoritmo de repetición espaciada
+La gracia es que usa ML para optimizar el aprendizaje de los usuarios,
+pero es un proceso que se puede realizar 1 vez al día o después de tener
+mucho historial de entrenamiento (cientos o miles de logs).
+
+Primero, FSRS como tal tiene parámetros entrenables que son genéricos
+para cualquier usuario. Según la docu, estos parámetros fueron extraídos
+con cientos de millones de reviews para 10k usuarios
+(ver https://github.com/open-spaced-repetition/awesome-fsrs/wiki/ABC-of-FSRS)
+
+Los parámetros son:
+{
+request_retention: 0.9,
+maximum_interval: 36500,
+w: [
+0.212, 1.2931, 2.3065,
+8.2956, 6.4133, 0.8334,
+3.0194, 0.001, 1.8722,
+0.1666, 0.796, 1.4835,
+0.0614, 0.2629, 1.6483,
+0.6014, 1.8729, 0.5425,
+0.0912, 0.0658, 0.1542
+],
+enable_fuzz: false,
+enable_short_term: true,
+learning_steps: [ '1m', '10m' ],
+relearning_steps: [ '10m' ]
+}
+
+Esto tenemos que guardarlo serializado por cada usuario cuando se crea una cuenta
+El tema es si lo asociamos al user_profile como un campo tipo 'fsrs', o bien,
+creamos una tabla específica (no creo)
+
+Las cartas en FSRS son así:
+
+due: 2026-04-30T03:31:13.223Z, (próxima revisión)
+stability: 10.97104786, (uso interno)
+difficulty: 2.1043314, (uso interno)
+elapsed_days: 2, (deprecated)
+scheduled_days: 11, (días hasta la siguiente revisión desde last_review)
+reps: 3, (repeticiones)
+lapses: 0, ()
+learning_steps: 0,
+state: 2, (estado de la carta: New, Learning, Review, Relearning)
+last_review: 2026-04-19T03:31:13.223Z (última revisión, que es el preciso momento que se crea la carta o se califica)
+
+Cada respuesta tiene sus propios atributos
+Existen 4 respuestas a una carta:
+Again, Hard, Good, Easy
+Cuando se responde, todos los atributos de la carta se modifican
+
+Para que el algorimto funcione, hay que guardar el último resultado de la calificación de la carta
+(los atributos de arriba), no es necesario tener un historial completo.
+
+Sin embargo, por temas de auditoria, rollbacks, o recrear el historial de calificaciones,
+sería importante guardar los logs, ¿quizás para visualizar cómo ha mejorado su retención?
+
+El tema es que no sabría qué variables usar para medir eso.
+A nivel de bbdd, yo creo que es suficiente con guardar el JSON serializado de los atributos
+
+En principio, cualquier error crea un ejercicio.
+Pero la idea es tener un esquema lo suficientemente flexible para:
+
+- crear un ejercicio a partir de un error existente
+- crear un ejercicio nuevo a partir de un resumen de errores
+- crear un ejercicio a partir de un error existente con una pequeña variación
+- soportar placeholders (la frase está incompleta)
+
+El formato de las cartas también debe ser flexible:
+
+- escribir la respuesta completa
+- seleccionar la alternativa correcta
+
 ## Casos borde
 
 Lo que está entre `<e>` y `</e>` es un error y entre `<s>` y `</s>` una sugerencia del LLM.
@@ -81,3 +157,10 @@ La sugerencia no debería incluir texto anterior a donde se encuentra el error e
 ```
 Me gustaría <e>ir salir</e> <s>ir de vacaciones</s> vacaciones
 ```
+
+## FSRS
+
+Recursos:
+
+- https://github.com/open-spaced-repetition/awesome-fsrs/wiki/ABC-of-FSRS
+- https://expertium.github.io/Algorithm.html
