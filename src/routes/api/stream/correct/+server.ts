@@ -41,7 +41,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const readableStream = createRedisNdjsonStream({
 		redisUrl: REDIS_URL,
 		streamKey: `correct:${data.messageId}`,
-		blockMs: 8192,
+		blockMs: 32_768,
 		count: 8
 	});
 	return new Response(readableStream, {

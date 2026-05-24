@@ -1,7 +1,7 @@
 import { ndjson } from '$lib/utils';
 import { createClient } from 'redis';
 import z from 'zod';
-import { streamEventChunk, streamEventDone, streamEventError } from './stream-events';
+import { streamEventChunk, streamEventDone, streamEventError } from '../stream-events';
 
 const redisStreamSchema = z
 	.array(
@@ -24,7 +24,7 @@ const redisStreamSchema = z
 export function createRedisNdjsonStream({
 	redisUrl,
 	streamKey,
-	blockMs = 8192,
+	blockMs = 32_768,
 	count = 8
 }: {
 	redisUrl: string;
