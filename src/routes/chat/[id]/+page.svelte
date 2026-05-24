@@ -4,7 +4,7 @@
 	import type { SubmitFunction } from './$types';
 	import { segmentMessageByCorrections } from '$lib/message-tokens';
 	import { CorrectStreamManager, ReplyStreamManager } from '$lib/stream-manager';
-	import z from 'zod';
+	import { messageCorrectionResponseSchema } from '$lib/prompts/message-correction';
 
 	const { data, params }: PageProps = $props();
 
@@ -53,18 +53,11 @@
 	};
 
 	const llmJsonToCorrections = (content: string, llmJson: string) => {
-		const zodSchema = z.array(
-			z.object({
-				fragment: z.string().min(1),
-				reason: z.string().min(1),
-				suggestions: z.array(z.object({ replacement: z.string().min(1) }))
-			})
-		);
-		const { success, data } = zodSchema.safeParse(JSON.parse(llmJson));
+		const { success, data } = messageCorrectionResponseSchema.safeParse(JSON.parse(llmJson));
 		if (!success) {
 			throw new Error('Invalid JSON response from LLM.');
 		}
-		return data.map(({ fragment, reason, suggestions }) => {
+		return data.corrections.map(({ fragment, reason, suggestions }) => {
 			const start = content.indexOf(fragment);
 			const end = start + fragment.length - 1;
 			return {

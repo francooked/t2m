@@ -8,9 +8,10 @@ import {
 	index,
 	jsonb
 } from 'drizzle-orm/pg-core';
+import { isNull } from 'drizzle-orm';
 import { user } from './auth.schema';
 import { EXERCISE_TYPES, LANGUAGES, MESSAGE_STATUS, ROLES, SRS_ALGORITHMS } from '$lib/constants';
-import { isNull } from 'drizzle-orm';
+import type { ExercisePayload } from '$lib/exercise/exercise-payload';
 
 export const languageEnum = pgEnum('language', LANGUAGES);
 export const messageRoleEnum = pgEnum('message_role', ROLES);
@@ -105,11 +106,11 @@ export const exercise = pgTable(
 		userId: text('user_id')
 			.references(() => user.id, { onDelete: 'cascade' })
 			.notNull(),
+		targetLanguage: languageEnum('target_language').notNull(),
 		type: exerciseTypeEnum('type').notNull(),
-		source: jsonb('source').$type<{ type: 'correction'; correctionId: number }>().notNull(),
-		payload: jsonb('payload')
-			.$type<{ version: number } & { type: 'full_answer'; front: string; back: string }>()
-			.notNull(),
+		version: integer('version').notNull(),
+		source: jsonb('source').$type<{ type: 'correction'; correctionIds: number[] }>().notNull(),
+		payload: jsonb('payload').$type<ExercisePayload>().notNull(),
 		createdAt: timestamp('created_at').defaultNow().notNull(),
 		archivedAt: timestamp('archived_at')
 	},

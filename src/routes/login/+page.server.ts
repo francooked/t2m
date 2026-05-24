@@ -6,6 +6,7 @@ import z from 'zod';
 import { LANGUAGES } from '$lib/constants';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/db/schema';
+import { generatorParameters } from 'ts-fsrs';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (locals.user) return redirect(302, '/chat');
@@ -31,9 +32,15 @@ export const actions = {
 
 		try {
 			const { user } = await auth.api.signUpEmail({ body: { ...data } });
-			await db
-				.insert(schema.userProfile)
-				.values([{ userId: user.id, nativeLanguage: data.nativeLanguage }]);
+			await db.transaction(async (tx) => {
+				await tx
+					.insert(schema.userProfile)
+					.values([{ userId: user.id, nativeLanguage: data.nativeLanguage }]);
+				const fsrsParameters = generatorParameters();
+				await tx
+					.insert(schema.userSrsProfile)
+					.values({ userId: user.id, algorithm: 'fsrs', setup: fsrsParameters });
+			});
 		} catch (error) {
 			if (error instanceof APIError) {
 				return fail(400, { code: 'signup_failed', message: error.message || 'Signup failed' });

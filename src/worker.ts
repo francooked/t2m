@@ -1,5 +1,5 @@
-import { prompts as correctionPrompts } from '$lib/prompts/correction';
-import { prompts as replyPrompts } from '$lib/prompts/reply';
+import { prompts as correctionPrompts } from '$lib/prompts/message-correction';
+import { prompts as replyPrompts } from '$lib/prompts/conversation-reply';
 import { Worker } from 'bullmq';
 import Groq from 'groq-sdk';
 import { createClient } from 'redis';
@@ -149,6 +149,7 @@ export const correctionWorker = new Worker<{ messageId: number; chatId: number }
 
 		const chats = await db
 			.select({
+				userId: schema.userProfile.userId,
 				nativeLanguage: schema.userProfile.nativeLanguage,
 				targetLanguage: schema.chat.targetLanguage
 			})
@@ -197,24 +198,27 @@ export const correctionWorker = new Worker<{ messageId: number; chatId: number }
 		}
 		redisClient.xAdd(`correct:${messageId}`, '*', { content: '', done: 'true' });
 
-		const zodSchema = z.array(
-			z.object({
-				fragment: z.string().min(1),
-				reason: z.string().min(1),
-				suggestions: z.array(z.object({ replacement: z.string().min(1) }))
-			})
-		);
+		const zodSchema = z.object({
+			translation: z.string().min(1),
+			corrections: z.array(
+				z.object({
+					fragment: z.string().min(1),
+					reason: z.string().min(1),
+					suggestions: z.array(z.object({ replacement: z.string().min(1) }))
+				})
+			)
+		});
 		const { success, data } = zodSchema.safeParse(JSON.parse(fullContent));
 		if (!success) {
 			throw new Error('Invalid JSON response from LLM.');
 		}
 
-		if (data.length > 0) {
-			await db.transaction(async (tx) => {
+		if (data.corrections.length > 0) {
+			const { corrections, suggestions } = await db.transaction(async (tx) => {
 				const corrections = await tx
 					.insert(schema.correction)
 					.values(
-						data.map(({ fragment, reason }) => {
+						data.corrections.map(({ fragment, reason }) => {
 							const start = lastMessage.content.indexOf(fragment);
 							const end = start + fragment.length - 1;
 							return {
@@ -226,14 +230,36 @@ export const correctionWorker = new Worker<{ messageId: number; chatId: number }
 						})
 					)
 					.returning({ id: schema.correction.id });
-				const suggestions = await tx.insert(schema.suggestion).values(
-					data.flatMap(({ suggestions }, index) => {
-						return suggestions.map(({ replacement }) => ({
-							correctionId: corrections[index].id,
-							replacement
-						}));
-					})
+				const suggestions = await tx
+					.insert(schema.suggestion)
+					.values(
+						data.corrections.flatMap(({ suggestions }, index) => {
+							return suggestions.map(({ replacement }) => ({
+								correctionId: corrections[index].id,
+								replacement
+							}));
+						})
+					)
+					.returning({ id: schema.suggestion.id });
+				const front = lastMessage.content;
+				const back = data.corrections.reduce(
+					(acc, { fragment, suggestions }) => acc.replace(fragment, suggestions[0].replacement),
+					lastMessage.content
 				);
+				const extra = data.translation;
+				const exercises = await tx
+					.insert(schema.exercise)
+					.values({
+						userId: chats[0].userId,
+						targetLanguage: chats[0].targetLanguage,
+						type: 'full_answer',
+						version: 2,
+						source: { type: 'correction', correctionIds: corrections.map(({ id }) => id) },
+						payload: { front, back, extra }
+					})
+					.returning({ id: schema.exercise.id });
+
+				return { corrections, suggestions, exercises };
 			});
 		}
 
