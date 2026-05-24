@@ -158,9 +158,32 @@ La sugerencia no debería incluir texto anterior a donde se encuentra el error e
 Me gustaría <e>ir salir</e> <s>ir de vacaciones</s> vacaciones
 ```
 
+La respuesta debería decir algo como: ¿qué quieres ir a Vacaciones? No conozco ese lugar. ¿No será ir de vacaciones?
+
+```
+Quiero <e>ir vacaciones</e> <s>ir a vacaciones</s>
+```
+
+Esto se entiende, solo que le faltan los acentos, la idea sería que corrigiera lo justo y necesario, NO toda la oración
+
+```
+<e>he visto chile, pero no se, que opinas?</e> <s>He visto Chile, pero no sé, ¿qué opinas?</s>
+```
+
+Quiero <e>ir vacación
+
+Quiero ir vacación ir de vacacionesvacación vacaciones
+
 ## FSRS
 
 Recursos:
 
 - https://github.com/open-spaced-repetition/awesome-fsrs/wiki/ABC-of-FSRS
 - https://expertium.github.io/Algorithm.html
+
+## No considerados al inicio
+
+- [x] creaba las corecciones sin saber lo que realmente quiso comunicar el usuario - me faltó poner la traducción del mensaje erróneo
+- [ ] si no se entiende el mensaje del usuario, no crear un ejercicio al tiro, sino preguntar qué quiso decir y recién ahí corregir (si aplica) pero añadiendo la traducción
+- [ ] A veces la oración que dice un usuario es parcialmente correcta y podría clarificarse cuando sí se dice de su manera. Ejemplo, "voy en el gimnasio" en realidad se dice "voy al gimnasio", pero decir "voy en el" se podría completar como "voy en el auto".
+- [ ] Agregar lo que realmente se entiende con lo que dijo vs lo que realmente quiso decir, ejemplo, "la comida es fría" da a entender que la comida fuera una persona con sentimientos, que es diferente a decir "la comida ESTÁ fría"
