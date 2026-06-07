@@ -253,7 +253,7 @@ export const correctionWorker = new Worker<{ messageId: number; chatId: number }
 						userId: chats[0].userId,
 						targetLanguage: chats[0].targetLanguage,
 						type: 'full_answer',
-						version: 2,
+						version: 1,
 						source: { type: 'correction', correctionIds: corrections.map(({ id }) => id) },
 						payload: { front, back, extra }
 					})
