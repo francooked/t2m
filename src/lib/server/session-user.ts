@@ -1,8 +1,6 @@
-import z from 'zod';
+import type { auth } from './auth';
 
 export function requireUserSession(locals: App.Locals) {
 	if (!locals.user) return null;
-	const schema = z.object({ id: z.string() });
-	const { data: signedInUser } = schema.safeParse(locals.user);
-	return signedInUser ?? null;
+	return locals.user as typeof auth.$Infer.Session.user;
 }
