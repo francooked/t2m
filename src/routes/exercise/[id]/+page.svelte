@@ -45,7 +45,7 @@
 
 <h1 class="font-medium">Ejercicio {params.id}</h1>
 {#if phase === 'answering'}
-	{#if data.exercise.type === 'full_answer' && data.exercise.version === 2}
+	{#if data.exercise.type === 'full_answer' && data.exercise.version === 1}
 		<form method="post" action="?/checkAnswer" use:enhance={handleCheckAnswer}>
 			<p>{data.exercise.payload.extra}</p>
 			<label for={`answer_${data.exercise.id}`}>Respuesta:</label>
@@ -54,7 +54,7 @@
 			<input type="hidden" name="exercise_id" value={data.exercise.id} />
 		</form>
 	{/if}
-{:else if data.exercise.type === 'full_answer' && data.exercise.version === 2}
+{:else if data.exercise.type === 'full_answer' && data.exercise.version === 1}
 	{#each differences as { added, removed, value }}
 		{#if added}
 			<span class="bg-green-200">{value}</span>

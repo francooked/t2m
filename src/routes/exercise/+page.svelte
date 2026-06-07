@@ -18,7 +18,7 @@
 <h2 class="font-medium">Nuevos ({data.newExercises.length})</h2>
 <ul>
 	{#each previewNewExercises as exercise}
-		{#if exercise.type === 'full_answer' && exercise.version === 2}
+		{#if exercise.type === 'full_answer' && exercise.version === 1}
 			<li>{exercise.payload.extra}</li>
 		{/if}
 	{/each}
@@ -30,7 +30,7 @@
 <h2 class="font-medium">Pendientes ({data.pendingExercises.length})</h2>
 <ul>
 	{#each previewPendingExercises as exercise}
-		{#if exercise.type === 'full_answer' && exercise.version === 2}
+		{#if exercise.type === 'full_answer' && exercise.version === 1}
 			<li>{exercise.payload.front}</li>
 		{/if}
 	{/each}
