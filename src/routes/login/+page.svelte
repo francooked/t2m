@@ -6,6 +6,8 @@
 
 	let {}: PageProps = $props();
 
+	const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 	const handleSignInEmail: SubmitFunction = () => {
 		return async ({ result, update }) => {
 			if (result.type === 'redirect') {
@@ -51,5 +53,6 @@
 			<option value={language}>{language}</option>
 		{/each}
 	</select>
+	<input type="hidden" name="time_zone" value={timeZone} />
 	<button type="submit">Registrarse</button>
 </form>

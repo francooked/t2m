@@ -3,7 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { auth } from '$lib/server/auth';
 import { APIError } from 'better-auth/api';
 import z from 'zod';
-import { LANGUAGES } from '$lib/constants';
+import { LANGUAGES, TIME_ZONES } from '$lib/constants';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/db/schema';
 import { generatorParameters } from 'ts-fsrs';
@@ -14,28 +14,32 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions = {
 	signUpEmail: async ({ request }) => {
-		const zodSchema = z.object({
+		const formDataSchema = z.object({
 			email: z.email(),
 			password: z.string().min(1),
 			name: z.string().min(1),
-			nativeLanguage: z.enum(LANGUAGES)
+			nativeLanguage: z.enum(LANGUAGES),
+			timeZone: z.enum(TIME_ZONES)
 		});
 		const formData = await request.formData();
-		const { error, data } = zodSchema.safeParse({
+		const formDataParse = formDataSchema.safeParse({
 			email: formData.get('email')?.toString() ?? '',
 			password: formData.get('password')?.toString() ?? '',
 			name: formData.get('name')?.toString() ?? '',
-			nativeLanguage: formData.get('native_language')?.toString() ?? ''
+			nativeLanguage: formData.get('native_language')?.toString() ?? '',
+			timeZone: formData.get('time_zone')?.toString() ?? ''
 		});
 
-		if (error) return fail(400, { code: 'invalid_form' });
+		if (formDataParse.error) return fail(400, { code: 'invalid_form' });
 
 		try {
-			const { user } = await auth.api.signUpEmail({ body: { ...data } });
+			const { user } = await auth.api.signUpEmail({ body: { ...formDataParse.data } });
 			await db.transaction(async (tx) => {
-				await tx
-					.insert(schema.userProfile)
-					.values([{ userId: user.id, nativeLanguage: data.nativeLanguage }]);
+				await tx.insert(schema.userProfile).values({
+					userId: user.id,
+					nativeLanguage: formDataParse.data.nativeLanguage,
+					timeZone: formDataParse.data.timeZone
+				});
 				const fsrsParameters = generatorParameters();
 				await tx
 					.insert(schema.userSrsProfile)
@@ -51,20 +55,20 @@ export const actions = {
 		return redirect(303, '/chat');
 	},
 	signInEmail: async ({ request }) => {
-		const schema = z.object({
+		const formDataSchema = z.object({
 			email: z.email(),
 			password: z.string().min(1)
 		});
 		const formData = await request.formData();
-		const { error, data } = schema.safeParse({
+		const formDataParse = formDataSchema.safeParse({
 			email: formData.get('email')?.toString() ?? '',
 			password: formData.get('password')?.toString() ?? ''
 		});
 
-		if (error) return fail(400, { code: 'invalid_form' });
+		if (formDataParse.error) return fail(400, { code: 'invalid_form' });
 
 		try {
-			await auth.api.signInEmail({ body: { ...data } });
+			await auth.api.signInEmail({ body: { ...formDataParse.data } });
 		} catch (error) {
 			if (error instanceof APIError) {
 				return fail(400, { code: 'signin_failed', message: error.message || 'Signin failed' });

@@ -10,7 +10,14 @@ import {
 } from 'drizzle-orm/pg-core';
 import { isNull } from 'drizzle-orm';
 import { user } from './auth.schema';
-import { EXERCISE_TYPES, LANGUAGES, MESSAGE_STATUS, ROLES, SRS_ALGORITHMS } from '$lib/constants';
+import {
+	EXERCISE_TYPES,
+	LANGUAGES,
+	MESSAGE_STATUS,
+	ROLES,
+	SRS_ALGORITHMS,
+	TIME_ZONES
+} from '$lib/constants';
 import type { ExercisePayload } from '$lib/exercise/exercise-payload';
 
 export const languageEnum = pgEnum('language', LANGUAGES);
@@ -18,12 +25,14 @@ export const messageRoleEnum = pgEnum('message_role', ROLES);
 export const messageStatusEnum = pgEnum('message_status', MESSAGE_STATUS);
 export const exerciseTypeEnum = pgEnum('exercise_type', EXERCISE_TYPES);
 export const srsAlgorithmEnum = pgEnum('srs_algorithm', SRS_ALGORITHMS);
+export const timeZoneEnum = pgEnum('time_zone', TIME_ZONES);
 
 export const userProfile = pgTable('user_profile', {
 	userId: text('user_id')
 		.primaryKey()
 		.references(() => user.id, { onDelete: 'cascade' }),
 	nativeLanguage: languageEnum('native_language').notNull(),
+	timeZone: timeZoneEnum('time_zone').notNull(),
 	createdAt: timestamp('created_at').defaultNow().notNull(),
 	updatedAt: timestamp('updated_at')
 		.defaultNow()
