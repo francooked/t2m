@@ -24,19 +24,22 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	});
 	if (!success) return error(400, { message: 'Invalid input.', code: 'invalid_input' });
 
-	const chats = await db
-		.select({ id: schema.chat.id })
-		.from(schema.chat)
-		.innerJoin(schema.message, eq(schema.chat.id, schema.message.chatId))
-		.where(
-			and(
-				eq(schema.chat.id, data.chatId),
-				eq(schema.chat.userId, signedInUser.id),
-				eq(schema.message.id, data.messageId)
+	const chat = (
+		await db
+			.select({ id: schema.chat.id })
+			.from(schema.chat)
+			.innerJoin(schema.message, eq(schema.chat.id, schema.message.chatId))
+			.where(
+				and(
+					eq(schema.chat.id, data.chatId),
+					eq(schema.chat.userId, signedInUser.id),
+					eq(schema.message.id, data.messageId)
+				)
 			)
-		)
-		.limit(1);
-	if (chats.length !== 1) return error(403, { message: 'Chat not found.', code: 'chat_not_found' });
+			.limit(1)
+	).at(0);
+
+	if (!chat) return error(403, { message: 'Chat not found.', code: 'chat_not_found' });
 
 	const readableStream = createRedisNdjsonStream({
 		redisUrl: REDIS_URL,

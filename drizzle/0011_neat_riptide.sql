@@ -1,0 +1,1 @@
+ALTER TYPE "public"."language" RENAME TO "language_code";

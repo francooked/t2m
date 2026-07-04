@@ -1,6 +1,6 @@
 import type { PromptFn } from './utils';
 import z from 'zod';
-import type { LANGUAGES } from '$lib/constants';
+import type { LANGUAGE_CODES } from '$lib/constants';
 import dedent from 'dedent';
 
 export const translationFeedbackSchema = z.object({
@@ -11,7 +11,10 @@ export type LLMTranslationFeedback = z.infer<typeof translationFeedbackSchema>;
 
 export const prompts: PromptFn<
 	{ original: string; expected: string; answer: string },
-	{ nativeLanguage: (typeof LANGUAGES)[number]; targetLanguage: (typeof LANGUAGES)[number] }
+	{
+		nativeLanguage: (typeof LANGUAGE_CODES)[number];
+		targetLanguage: (typeof LANGUAGE_CODES)[number];
+	}
 > = (input, options) => {
 	return [
 		{

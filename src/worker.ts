@@ -1,4 +1,4 @@
-import { prompts as correctionPrompts } from '$lib/prompts/message-correction';
+import { prompts as correctionPrompts } from '$lib/prompts/message-rewrite';
 import { prompts as replyPrompts } from '$lib/prompts/conversation-reply';
 import { Worker } from 'bullmq';
 import Groq from 'groq-sdk';
@@ -28,16 +28,24 @@ export const replyWorker = new Worker<{ messageId: number; chatId: number }, voi
 		const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 		const pgClient = postgres(process.env.DATABASE_URL);
 		const db = drizzle(pgClient, { schema: { ...schema, ...authSchema } });
-		const chats = await db
-			.select({
-				nativeLanguage: schema.userProfile.nativeLanguage,
-				targetLanguage: schema.chat.targetLanguage
-			})
-			.from(schema.message)
-			.innerJoin(schema.chat, eq(schema.message.chatId, schema.chat.id))
-			.innerJoin(schema.userProfile, eq(schema.chat.userId, schema.userProfile.userId))
-			.where(and(eq(schema.message.id, messageId), eq(schema.chat.id, chatId)))
-			.limit(1);
+
+		const chat = (
+			await db
+				.select({
+					nativeLanguage: schema.userProfile.nativeLanguage,
+					targetLanguage: schema.chat.targetLanguage
+				})
+				.from(schema.message)
+				.innerJoin(schema.chat, eq(schema.message.chatId, schema.chat.id))
+				.innerJoin(schema.userProfile, eq(schema.chat.userId, schema.userProfile.userId))
+				.where(and(eq(schema.message.id, messageId), eq(schema.chat.id, chatId)))
+				.limit(1)
+		).at(0);
+
+		if (!chat) {
+			throw new Error('Chat not found.');
+		}
+
 		const messages = await db
 			.select({
 				content: schema.message.content,
@@ -46,12 +54,13 @@ export const replyWorker = new Worker<{ messageId: number; chatId: number }, voi
 			.from(schema.message)
 			.innerJoin(schema.chat, eq(schema.message.chatId, schema.chat.id))
 			.where(and(lt(schema.message.id, messageId), eq(schema.chat.id, chatId)));
+
 		const groqStream = await groqClient.chat.completions.create({
 			messages: replyPrompts(
 				messages.map(({ role, content }) => ({ role, content })),
 				{
-					nativeLanguage: chats[0].nativeLanguage,
-					targetLanguage: chats[0].targetLanguage
+					nativeLanguage: chat.nativeLanguage,
+					targetLanguage: chat.targetLanguage
 				}
 			),
 			model: 'openai/gpt-oss-20b',
@@ -147,18 +156,23 @@ export const correctionWorker = new Worker<{ messageId: number; chatId: number }
 		const pgClient = postgres(process.env.DATABASE_URL);
 		const db = drizzle(pgClient, { schema: { ...schema, ...authSchema } });
 
-		const chats = await db
-			.select({
-				userId: schema.userProfile.userId,
-				nativeLanguage: schema.userProfile.nativeLanguage,
-				targetLanguage: schema.chat.targetLanguage
-			})
-			.from(schema.chat)
-			.innerJoin(schema.message, eq(schema.chat.id, schema.message.chatId))
-			.innerJoin(schema.userProfile, eq(schema.chat.userId, schema.userProfile.userId))
-			.where(and(eq(schema.chat.id, chatId), eq(schema.message.id, messageId)))
-			.limit(1);
-		if (chats.length !== 1) throw new Error('Chat not found.');
+		const chat = (
+			await db
+				.select({
+					userId: schema.userProfile.userId,
+					nativeLanguage: schema.userProfile.nativeLanguage,
+					targetLanguage: schema.chat.targetLanguage
+				})
+				.from(schema.chat)
+				.innerJoin(schema.message, eq(schema.chat.id, schema.message.chatId))
+				.innerJoin(schema.userProfile, eq(schema.chat.userId, schema.userProfile.userId))
+				.where(and(eq(schema.chat.id, chatId), eq(schema.message.id, messageId)))
+				.limit(1)
+		).at(0);
+
+		if (!chat) {
+			throw new Error('Chat not found.');
+		}
 
 		const messages = await db
 			.select({
@@ -170,6 +184,7 @@ export const correctionWorker = new Worker<{ messageId: number; chatId: number }
 			.orderBy(desc(schema.message.id))
 			.limit(4);
 		messages.reverse();
+
 		const lastMessage = messages.at(-1);
 		if (!lastMessage || lastMessage.role !== 'user')
 			throw new Error('Last message not found or is not a user message.');
@@ -178,8 +193,8 @@ export const correctionWorker = new Worker<{ messageId: number; chatId: number }
 			messages: correctionPrompts(
 				messages.map(({ role, content }) => ({ role, content })),
 				{
-					nativeLanguage: chats[0].nativeLanguage,
-					targetLanguage: chats[0].targetLanguage
+					nativeLanguage: chat.nativeLanguage,
+					targetLanguage: chat.targetLanguage
 				}
 			),
 			model: 'openai/gpt-oss-20b',
@@ -230,6 +245,7 @@ export const correctionWorker = new Worker<{ messageId: number; chatId: number }
 						})
 					)
 					.returning({ id: schema.correction.id });
+
 				const suggestions = await tx
 					.insert(schema.suggestion)
 					.values(
@@ -241,6 +257,7 @@ export const correctionWorker = new Worker<{ messageId: number; chatId: number }
 						})
 					)
 					.returning({ id: schema.suggestion.id });
+
 				const front = lastMessage.content;
 				const back = data.corrections.reduce(
 					(acc, { fragment, suggestions }) => acc.replace(fragment, suggestions[0].replacement),

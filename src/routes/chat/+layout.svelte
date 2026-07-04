@@ -9,4 +9,9 @@
 	<button type="submit" class="font-medium">Sign Out</button>
 </form>
 
+<div>
+	<a href="/chat" class="font-medium">Chats</a>
+	<a href="/exercise" class="font-medium">Ejercicios</a>
+</div>
+
 {@render children?.()}

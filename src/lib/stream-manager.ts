@@ -6,7 +6,8 @@ import {
 	type Unsubscriber
 } from 'svelte/store';
 import { streamEventSchema, type StreamEvent } from './stream-events';
-import { messageCorrectionResponseSchema } from './prompts/message-correction';
+import { messageRewriteResponseSchema } from './prompts/message-rewrite';
+import { messageReplyResponseSchema } from './prompts/conversation-reply';
 
 function parseStreamEventLine(line: string): StreamEvent {
 	let parsed: unknown;
@@ -143,7 +144,7 @@ export class CorrectStream extends RedisTextStream {
 			throw new Error(`Invalid JSON response from LLM: ${content}`);
 		}
 
-		const result = messageCorrectionResponseSchema.safeParse(parsed);
+		const result = messageRewriteResponseSchema.safeParse(parsed);
 		if (!result.success) {
 			throw new Error(`LLM response does not match correction schema: ${content}`);
 		}
@@ -154,6 +155,22 @@ export class ReplyStream extends RedisTextStream {
 	constructor({ chatId, messageId }: { chatId: number; messageId: number }) {
 		const url = '/api/stream/reply';
 		super({ url, chatId, messageId });
+	}
+
+	protected onFinish(content: string): void {
+		let parsed: unknown;
+
+		try {
+			parsed = JSON.parse(content);
+		} catch {
+			throw new Error(`Invalid JSON response from LLM: ${content}`);
+		}
+
+		const result = messageReplyResponseSchema.safeParse(parsed);
+
+		if (!result.success) {
+			throw new Error(`LLM response does not match reply schema: ${content}`);
+		}
 	}
 }
 

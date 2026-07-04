@@ -1,0 +1,1 @@
+DROP TABLE "rewrite_change" CASCADE;

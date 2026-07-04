@@ -12,7 +12,7 @@ import { isNull } from 'drizzle-orm';
 import { user } from './auth.schema';
 import {
 	EXERCISE_TYPES,
-	LANGUAGES,
+	LANGUAGE_CODES,
 	MESSAGE_STATUS,
 	ROLES,
 	SRS_ALGORITHMS,
@@ -20,7 +20,7 @@ import {
 } from '$lib/constants';
 import type { ExercisePayload } from '$lib/exercise/exercise-payload';
 
-export const languageEnum = pgEnum('language', LANGUAGES);
+export const languageCodeEnum = pgEnum('language_code', LANGUAGE_CODES);
 export const messageRoleEnum = pgEnum('message_role', ROLES);
 export const messageStatusEnum = pgEnum('message_status', MESSAGE_STATUS);
 export const exerciseTypeEnum = pgEnum('exercise_type', EXERCISE_TYPES);
@@ -31,7 +31,7 @@ export const userProfile = pgTable('user_profile', {
 	userId: text('user_id')
 		.primaryKey()
 		.references(() => user.id, { onDelete: 'cascade' }),
-	nativeLanguage: languageEnum('native_language').notNull(),
+	nativeLanguage: languageCodeEnum('native_language').notNull(),
 	timeZone: timeZoneEnum('time_zone').notNull(),
 	createdAt: timestamp('created_at').defaultNow().notNull(),
 	updatedAt: timestamp('updated_at')
@@ -55,7 +55,7 @@ export const chat = pgTable(
 		userId: text('user_id')
 			.references(() => user.id, { onDelete: 'cascade' })
 			.notNull(),
-		targetLanguage: languageEnum('target_language').notNull(),
+		targetLanguage: languageCodeEnum('target_language').notNull(),
 		title: text('title').notNull(),
 		createdAt: timestamp('created_at').defaultNow().notNull(),
 		updatedAt: timestamp('updated_at')
@@ -81,31 +81,16 @@ export const message = pgTable(
 	(table) => [index('message_chatid_idx').on(table.chatId)]
 );
 
-export const correction = pgTable(
-	'correction',
+export const messageRewrite = pgTable(
+	'message_rewrite',
 	{
 		id: serial('id').primaryKey(),
-		messageId: integer('message_id')
-			.references(() => message.id, { onDelete: 'cascade' })
-			.notNull(),
-		start: integer('start').notNull(),
-		end: integer('end').notNull(),
-		reason: text('reason').notNull(),
+		messageId: integer('message_id').references(() => message.id, { onDelete: 'cascade' }),
+		text: text('text').notNull(),
+		index: integer('index').notNull(),
 		createdAt: timestamp('created_at').defaultNow().notNull()
 	},
-	(table) => [index('correction_messageid_idx').on(table.messageId)]
-);
-
-export const suggestion = pgTable(
-	'suggestion',
-	{
-		id: serial('id').primaryKey(),
-		correctionId: integer('correction_id')
-			.references(() => correction.id, { onDelete: 'cascade' })
-			.notNull(),
-		replacement: text('suggestion').notNull()
-	},
-	(table) => [index('suggestion_correctionid_idx').on(table.correctionId)]
+	(table) => [index('messagerewrite_messageid_idx').on(table.messageId)]
 );
 
 export const exercise = pgTable(
@@ -115,10 +100,10 @@ export const exercise = pgTable(
 		userId: text('user_id')
 			.references(() => user.id, { onDelete: 'cascade' })
 			.notNull(),
-		targetLanguage: languageEnum('target_language').notNull(),
+		targetLanguage: languageCodeEnum('target_language').notNull(),
 		type: exerciseTypeEnum('type').notNull(),
 		version: integer('version').notNull(),
-		source: jsonb('source').$type<{ type: 'correction'; correctionIds: number[] }>().notNull(),
+		source: jsonb('source').$type<{ messageRewriteId: number }>().notNull(),
 		payload: jsonb('payload').$type<ExercisePayload>().notNull(),
 		createdAt: timestamp('created_at').defaultNow().notNull(),
 		archivedAt: timestamp('archived_at')

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
-	import { LANGUAGES } from '$lib/constants';
+	import { LANGUAGE_CODE_LABELS, LANGUAGE_CODES } from '$lib/constants';
 	import type { PageProps, SubmitFunction } from './$types';
 
 	let { data }: PageProps = $props();
@@ -45,9 +45,10 @@
 <form method="post" action="?/startChat" class="p-2" use:enhance={handleStartChat}>
 	<textarea name="content" placeholder="¿Por dónde partimos?"></textarea>
 	<select name="target_language">
-		<option value="">Selecciona un idioma</option>
-		{#each LANGUAGES as language}
-			<option value={language}>{language}</option>
+		{#each LANGUAGE_CODES as languageCode}
+			{#if data.userProfile.nativeLanguage !== languageCode}
+				<option value={languageCode}>{LANGUAGE_CODE_LABELS.es[languageCode]}</option>
+			{/if}
 		{/each}
 	</select>
 	<button type="submit" class="font-medium">Enviar</button>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
-	import { LANGUAGES } from '$lib/constants';
+	import { LANGUAGE_CODES, LANGUAGE_CODE_LABELS } from '$lib/constants';
 	import type { PageProps, SubmitFunction } from './$types';
 
 	let {}: PageProps = $props();
@@ -48,9 +48,8 @@
 	<input id="signup_name" name="name" type="text" />
 	<label for="signup_native_language">Idioma Nativo</label>
 	<select id="signup_native_language" name="native_language">
-		<option value="">Selecciona un idioma</option>
-		{#each LANGUAGES as language}
-			<option value={language}>{language}</option>
+		{#each LANGUAGE_CODES as languageCode}
+			<option value={languageCode}>{LANGUAGE_CODE_LABELS.es[languageCode]}</option>
 		{/each}
 	</select>
 	<input type="hidden" name="time_zone" value={timeZone} />

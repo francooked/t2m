@@ -2,44 +2,27 @@
 	import type { PageProps } from './$types';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from './$types';
-	import { segmentMessageByCorrections } from '$lib/message-tokens';
-	import { CorrectStreamManager, ReplyStreamManager } from '$lib/stream-manager';
-	import { messageCorrectionResponseSchema } from '$lib/prompts/message-correction';
+	import { diffWords } from 'diff';
+	import { invalidateAll } from '$app/navigation';
 
 	const { data, params }: PageProps = $props();
-
-	const replyStreamManager = new ReplyStreamManager();
-	const correctStreamManager = new CorrectStreamManager();
+	let isPageLoading = $state(false);
 
 	const messages = $derived(
-		data.messages.map((message) =>
-			message.role === 'assistant'
-				? message
-				: { ...message, tokens: segmentMessageByCorrections(message.content, message.corrections) }
-		)
+		data.messages.map((message) => {
+			if (message.role === 'assistant') return message;
+
+			let changes = new Array<{ added: boolean; removed: boolean; value: string }>();
+			const lastMessageRewrite = message.messageRewrites.at(-1);
+
+			if (lastMessageRewrite) {
+				const changeObjects = diffWords(message.content, lastMessageRewrite.text);
+				changes = changeObjects.map(({ added, removed, value }) => ({ added, removed, value }));
+			}
+
+			return { ...message, changes };
+		})
 	);
-
-	$effect(() => {
-		const lastMessage = data.messages.at(-1);
-		if (
-			lastMessage &&
-			lastMessage.role === 'assistant' &&
-			(lastMessage.status === 'pending' || lastMessage.status === 'generating')
-		) {
-			replyStreamManager.start({ chatId: Number(params.id), messageId: lastMessage.id });
-		}
-	});
-
-	$effect(() => {
-		const lastMessage = data.messages.at(-2);
-		if (
-			lastMessage &&
-			lastMessage.role === 'user' &&
-			(lastMessage.status === 'pending' || lastMessage.status === 'correcting')
-		) {
-			correctStreamManager.start({ chatId: Number(params.id), messageId: lastMessage.id });
-		}
-	});
 
 	const handleReply: SubmitFunction = async () => {
 		return async ({ result, update }) => {
@@ -52,27 +35,26 @@
 		};
 	};
 
-	const llmJsonToCorrections = (content: string, llmJson: string) => {
-		const { success, data } = messageCorrectionResponseSchema.safeParse(JSON.parse(llmJson));
-		if (!success) {
-			throw new Error('Invalid JSON response from LLM.');
-		}
-		return data.corrections.map(({ fragment, reason, suggestions }) => {
-			const start = content.indexOf(fragment);
-			const end = start + fragment.length - 1;
-			return {
-				id: new Date().getDate(),
-				reason,
-				start,
-				end,
-				suggestions
-			};
-		});
-	};
+	$effect(() => {
+		const statuses = new Set(['pending', 'generating', 'correcting']);
+		if (!data.messages.some(({ status }) => statuses.has(status))) return;
+		console.log('Yeah');
+		const interval = setInterval(async () => {
+			isPageLoading = true;
+			await invalidateAll();
+			isPageLoading = false;
+		}, 1000);
+		return () => clearInterval(interval);
+	});
 </script>
 
 <div class="p-2">
-	<h1 class="font-bold underline">Mensajes</h1>
+	<h1 class="font-bold underline">
+		Mensajes
+		{#if isPageLoading}
+			<span class="text-gray-400">(Refrescando)</span>
+		{/if}
+	</h1>
 	{#each messages as message (message.id)}
 		{#if message.role === 'assistant'}
 			<div>
@@ -82,8 +64,6 @@
 						{message.content}
 					{:else if message.status === 'failed'}
 						Error al generar la respuesta
-					{:else}
-						{$replyStreamManager.get(message.id)?.content ?? 'Generando el mensaje'}
 					{/if}
 				</span>
 				{#if message.status === 'failed'}
@@ -96,34 +76,27 @@
 		{:else}
 			<div>
 				<span class="">Tú:</span>
-				{#if message.status === 'complete'}
-					{#each message.tokens as token}
-						{#if token.type === 'text'}
-							<span>{token.content}</span>
-						{:else}
-							<span class="text-red-400 line-through">{token.content}</span>
-							<span class="text-green-400">{token.suggestions[0].replacement}</span>
-						{/if}
-					{/each}
+
+				{#if message.status === 'correcting'}
+					<span class="text-gray-400">(Corrigiendo)</span>
 				{:else if message.status === 'failed'}
-					(Error) {message.content}
-				{:else if $correctStreamManager.get(message.id)?.status === 'done'}
-					{@const tokens = segmentMessageByCorrections(
-						message.content,
-						llmJsonToCorrections(message.content, $correctStreamManager.get(message.id)!.content)
-					)}
-					{#each tokens as token}
-						{#if token.type === 'text'}
-							<span>{token.content}</span>
+					<span class="text-red-400">(Error)</span>
+				{:else if message.status === 'pending'}
+					<span class="text-blue-400">(Pendiente)</span>
+				{/if}
+
+				{#if message.status === 'complete'}
+					{#each message.changes as change}
+						{#if change.removed}
+							<span class="text-red-400 line-through">{change.value}</span>
+						{:else if change.added}
+							<span class="text-green-400">{change.value}</span>
 						{:else}
-							<span class="text-red-400 line-through">{token.content}</span>
-							<span class="text-green-400">{token.suggestions[0].replacement}</span>
+							<span class="">{change.value}</span>
 						{/if}
+					{:else}
+						<span>{message.content}</span>
 					{/each}
-				{:else if $correctStreamManager.get(message.id)?.status === 'streaming'}
-					(Corrigiendo) {message.content}
-				{:else}
-					{message.content}
 				{/if}
 			</div>
 		{/if}

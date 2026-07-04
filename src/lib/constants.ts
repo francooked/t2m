@@ -1,5 +1,20 @@
 export const TIME_ZONE = 'America/Santiago' as const;
-export const LANGUAGES = ['en', 'es'] as const;
+
+// ISO 639-1 language codes.
+export const LANGUAGE_CODES = ['es', 'en'] as const;
+export const LANGUAGE_CODE_LABELS = {
+	es: {
+		es: 'Español',
+		en: 'Inglés'
+	},
+	en: {
+		es: 'Spanish',
+		en: 'English'
+	}
+} as const satisfies Record<
+	(typeof LANGUAGE_CODES)[number],
+	Record<(typeof LANGUAGE_CODES)[number], string>
+>;
 export const ROLES = ['assistant', 'user'] as const;
 export const MESSAGE_STATUS = [
 	'pending',

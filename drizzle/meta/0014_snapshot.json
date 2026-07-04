@@ -1,0 +1,1927 @@
+{
+  "id": "bdc45bda-20ee-49a6-bb59-e03d2a24bffa",
+  "prevId": "4cc346b8-2781-46a4-b148-c9df6941b086",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.chat": {
+      "name": "chat",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_language": {
+          "name": "target_language",
+          "type": "language_code",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "chat_userid_idx": {
+          "name": "chat_userid_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "chat_user_id_user_id_fk": {
+          "name": "chat_user_id_user_id_fk",
+          "tableFrom": "chat",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.correction": {
+      "name": "correction",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "message_id": {
+          "name": "message_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start": {
+          "name": "start",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end": {
+          "name": "end",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "correction_messageid_idx": {
+          "name": "correction_messageid_idx",
+          "columns": [
+            {
+              "expression": "message_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "correction_message_id_message_id_fk": {
+          "name": "correction_message_id_message_id_fk",
+          "tableFrom": "correction",
+          "tableTo": "message",
+          "columnsFrom": [
+            "message_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.exercise": {
+      "name": "exercise",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_language": {
+          "name": "target_language",
+          "type": "language_code",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "exercise_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "exercise_userid_createdat_desc_idx": {
+          "name": "exercise_userid_createdat_desc_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "exercise_userid_createdat_desc_active_idx": {
+          "name": "exercise_userid_createdat_desc_active_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"exercise\".\"archived_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "exercise_user_id_user_id_fk": {
+          "name": "exercise_user_id_user_id_fk",
+          "tableFrom": "exercise",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.message": {
+      "name": "message",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chat_id": {
+          "name": "chat_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "message_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "message_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "message_chatid_idx": {
+          "name": "message_chatid_idx",
+          "columns": [
+            {
+              "expression": "chat_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "message_chat_id_chat_id_fk": {
+          "name": "message_chat_id_chat_id_fk",
+          "tableFrom": "message",
+          "tableTo": "chat",
+          "columnsFrom": [
+            "chat_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.message_rewrite": {
+      "name": "message_rewrite",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "message_id": {
+          "name": "message_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "index": {
+          "name": "index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "message_rewrite_message_id_message_id_fk": {
+          "name": "message_rewrite_message_id_message_id_fk",
+          "tableFrom": "message_rewrite",
+          "tableTo": "message",
+          "columnsFrom": [
+            "message_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rewrite_change": {
+      "name": "rewrite_change",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "rewrite_id": {
+          "name": "rewrite_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "removed": {
+          "name": "removed",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "added": {
+          "name": "added",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "start": {
+          "name": "start",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end": {
+          "name": "end",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rewrite_change_rewrite_id_message_rewrite_id_fk": {
+          "name": "rewrite_change_rewrite_id_message_rewrite_id_fk",
+          "tableFrom": "rewrite_change",
+          "tableTo": "message_rewrite",
+          "columnsFrom": [
+            "rewrite_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.suggestion": {
+      "name": "suggestion",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "correction_id": {
+          "name": "correction_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "suggestion": {
+          "name": "suggestion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "suggestion_correctionid_idx": {
+          "name": "suggestion_correctionid_idx",
+          "columns": [
+            {
+              "expression": "correction_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "suggestion_correction_id_correction_id_fk": {
+          "name": "suggestion_correction_id_correction_id_fk",
+          "tableFrom": "suggestion",
+          "tableTo": "correction",
+          "columnsFrom": [
+            "correction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_profile": {
+      "name": "user_profile",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "native_language": {
+          "name": "native_language",
+          "type": "language_code",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "time_zone": {
+          "name": "time_zone",
+          "type": "time_zone",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_profile_user_id_user_id_fk": {
+          "name": "user_profile_user_id_user_id_fk",
+          "tableFrom": "user_profile",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_srs_profile": {
+      "name": "user_srs_profile",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "algorithm": {
+          "name": "algorithm",
+          "type": "srs_algorithm",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "setup": {
+          "name": "setup",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_srs_profile_user_id_user_id_fk": {
+          "name": "user_srs_profile_user_id_user_id_fk",
+          "tableFrom": "user_srs_profile",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.account": {
+      "name": "account",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "access_token": {
+          "name": "access_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token": {
+          "name": "refresh_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "id_token": {
+          "name": "id_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "access_token_expires_at": {
+          "name": "access_token_expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token_expires_at": {
+          "name": "refresh_token_expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "account_userId_idx": {
+          "name": "account_userId_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "account_user_id_user_id_fk": {
+          "name": "account_user_id_user_id_fk",
+          "tableFrom": "account",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.session": {
+      "name": "session",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "session_userId_idx": {
+          "name": "session_userId_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "session_user_id_user_id_fk": {
+          "name": "session_user_id_user_id_fk",
+          "tableFrom": "session",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "session_token_unique": {
+          "name": "session_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user": {
+      "name": "user",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email_verified": {
+          "name": "email_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "user_email_unique": {
+          "name": "user_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.verification": {
+      "name": "verification",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "identifier": {
+          "name": "identifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "verification_identifier_idx": {
+          "name": "verification_identifier_idx",
+          "columns": [
+            {
+              "expression": "identifier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.fsrs_card": {
+      "name": "fsrs_card",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exercise_id": {
+          "name": "exercise_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state_blob": {
+          "name": "state_blob",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "next_due_at": {
+          "name": "next_due_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "fsrscard_userid_nextdueat_desc_idx": {
+          "name": "fsrscard_userid_nextdueat_desc_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "next_due_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fsrs_card_user_id_user_id_fk": {
+          "name": "fsrs_card_user_id_user_id_fk",
+          "tableFrom": "fsrs_card",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fsrs_card_exercise_id_exercise_id_fk": {
+          "name": "fsrs_card_exercise_id_exercise_id_fk",
+          "tableFrom": "fsrs_card",
+          "tableTo": "exercise",
+          "columnsFrom": [
+            "exercise_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "fsrscard_userid_exerciseid_uq": {
+          "name": "fsrscard_userid_exerciseid_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id",
+            "exercise_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.fsrs_review_log": {
+      "name": "fsrs_review_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fsrs_card_id": {
+          "name": "fsrs_card_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating": {
+          "name": "rating",
+          "type": "fsrs_rating",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state_blob": {
+          "name": "state_blob",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "fsrsreviewlog_userid_reviewedat_idx": {
+          "name": "fsrsreviewlog_userid_reviewedat_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "reviewed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "fsrsreviewlog_fsrscardid_reviewedat_idx": {
+          "name": "fsrsreviewlog_fsrscardid_reviewedat_idx",
+          "columns": [
+            {
+              "expression": "fsrs_card_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "reviewed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fsrs_review_log_user_id_user_id_fk": {
+          "name": "fsrs_review_log_user_id_user_id_fk",
+          "tableFrom": "fsrs_review_log",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fsrs_review_log_fsrs_card_id_fsrs_card_id_fk": {
+          "name": "fsrs_review_log_fsrs_card_id_fsrs_card_id_fk",
+          "tableFrom": "fsrs_review_log",
+          "tableTo": "fsrs_card",
+          "columnsFrom": [
+            "fsrs_card_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.exercise_type": {
+      "name": "exercise_type",
+      "schema": "public",
+      "values": [
+        "full_answer"
+      ]
+    },
+    "public.language_code": {
+      "name": "language_code",
+      "schema": "public",
+      "values": [
+        "es",
+        "en"
+      ]
+    },
+    "public.message_role": {
+      "name": "message_role",
+      "schema": "public",
+      "values": [
+        "assistant",
+        "user"
+      ]
+    },
+    "public.message_status": {
+      "name": "message_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "generating",
+        "correcting",
+        "complete",
+        "failed"
+      ]
+    },
+    "public.srs_algorithm": {
+      "name": "srs_algorithm",
+      "schema": "public",
+      "values": [
+        "fsrs"
+      ]
+    },
+    "public.time_zone": {
+      "name": "time_zone",
+      "schema": "public",
+      "values": [
+        "Africa/Algiers",
+        "Atlantic/Cape_Verde",
+        "Africa/Ndjamena",
+        "Africa/Abidjan",
+        "Africa/Bamako",
+        "Africa/Banjul",
+        "Africa/Conakry",
+        "Africa/Dakar",
+        "Africa/Freetown",
+        "Africa/Lome",
+        "Africa/Nouakchott",
+        "Africa/Ouagadougou",
+        "Atlantic/St_Helena",
+        "Africa/Cairo",
+        "Africa/Accra",
+        "Africa/Bissau",
+        "Africa/Nairobi",
+        "Africa/Addis_Ababa",
+        "Africa/Asmara",
+        "Africa/Dar_es_Salaam",
+        "Africa/Djibouti",
+        "Africa/Kampala",
+        "Africa/Mogadishu",
+        "Indian/Antananarivo",
+        "Indian/Comoro",
+        "Indian/Mayotte",
+        "Africa/Monrovia",
+        "Africa/Tripoli",
+        "Indian/Mauritius",
+        "Africa/Casablanca",
+        "Africa/El_Aaiun",
+        "Africa/Maputo",
+        "Africa/Blantyre",
+        "Africa/Bujumbura",
+        "Africa/Gaborone",
+        "Africa/Harare",
+        "Africa/Kigali",
+        "Africa/Lubumbashi",
+        "Africa/Lusaka",
+        "Africa/Windhoek",
+        "Africa/Lagos",
+        "Africa/Bangui",
+        "Africa/Brazzaville",
+        "Africa/Douala",
+        "Africa/Kinshasa",
+        "Africa/Libreville",
+        "Africa/Luanda",
+        "Africa/Malabo",
+        "Africa/Niamey",
+        "Africa/Porto-Novo",
+        "Indian/Reunion",
+        "Africa/Sao_Tome",
+        "Indian/Mahe",
+        "Africa/Johannesburg",
+        "Africa/Maseru",
+        "Africa/Mbabane",
+        "Africa/Khartoum",
+        "Africa/Juba",
+        "Africa/Tunis",
+        "Antarctica/Casey",
+        "Antarctica/Davis",
+        "Antarctica/Mawson",
+        "Indian/Kerguelen",
+        "Antarctica/DumontDUrville",
+        "Antarctica/Syowa",
+        "Antarctica/Troll",
+        "Antarctica/Vostok",
+        "Antarctica/Rothera",
+        "Asia/Kabul",
+        "Asia/Yerevan",
+        "Asia/Baku",
+        "Asia/Dhaka",
+        "Asia/Thimphu",
+        "Indian/Chagos",
+        "Asia/Brunei",
+        "Asia/Yangon",
+        "Asia/Shanghai",
+        "Asia/Urumqi",
+        "Asia/Hong_Kong",
+        "Asia/Taipei",
+        "Asia/Macau",
+        "Asia/Nicosia",
+        "Asia/Famagusta",
+        "Europe/Nicosia",
+        "Asia/Tbilisi",
+        "Asia/Dili",
+        "Asia/Kolkata",
+        "Asia/Jakarta",
+        "Asia/Pontianak",
+        "Asia/Makassar",
+        "Asia/Jayapura",
+        "Asia/Tehran",
+        "Asia/Baghdad",
+        "Asia/Jerusalem",
+        "Asia/Tokyo",
+        "Asia/Amman",
+        "Asia/Almaty",
+        "Asia/Qyzylorda",
+        "Asia/Qostanay",
+        "Asia/Aqtobe",
+        "Asia/Aqtau",
+        "Asia/Atyrau",
+        "Asia/Oral",
+        "Asia/Bishkek",
+        "Asia/Seoul",
+        "Asia/Pyongyang",
+        "Asia/Beirut",
+        "Asia/Kuala_Lumpur",
+        "Asia/Kuching",
+        "Indian/Maldives",
+        "Asia/Hovd",
+        "Asia/Ulaanbaatar",
+        "Asia/Choibalsan",
+        "Asia/Kathmandu",
+        "Asia/Karachi",
+        "Asia/Gaza",
+        "Asia/Hebron",
+        "Asia/Manila",
+        "Asia/Qatar",
+        "Asia/Bahrain",
+        "Asia/Riyadh",
+        "Asia/Aden",
+        "Asia/Kuwait",
+        "Asia/Singapore",
+        "Asia/Colombo",
+        "Asia/Damascus",
+        "Asia/Dushanbe",
+        "Asia/Bangkok",
+        "Asia/Phnom_Penh",
+        "Asia/Vientiane",
+        "Asia/Ashgabat",
+        "Asia/Dubai",
+        "Asia/Muscat",
+        "Asia/Samarkand",
+        "Asia/Tashkent",
+        "Asia/Ho_Chi_Minh",
+        "Australia/Darwin",
+        "Australia/Perth",
+        "Australia/Eucla",
+        "Australia/Brisbane",
+        "Australia/Lindeman",
+        "Australia/Adelaide",
+        "Australia/Hobart",
+        "Australia/Currie",
+        "Australia/Melbourne",
+        "Australia/Sydney",
+        "Australia/Broken_Hill",
+        "Australia/Lord_Howe",
+        "Antarctica/Macquarie",
+        "Indian/Christmas",
+        "Indian/Cocos",
+        "Pacific/Fiji",
+        "Pacific/Gambier",
+        "Pacific/Marquesas",
+        "Pacific/Tahiti",
+        "Pacific/Guam",
+        "Pacific/Saipan",
+        "Pacific/Tarawa",
+        "Pacific/Enderbury",
+        "Pacific/Kiritimati",
+        "Pacific/Majuro",
+        "Pacific/Kwajalein",
+        "Pacific/Chuuk",
+        "Pacific/Pohnpei",
+        "Pacific/Kosrae",
+        "Pacific/Nauru",
+        "Pacific/Noumea",
+        "Pacific/Auckland",
+        "Pacific/Chatham",
+        "Antarctica/McMurdo",
+        "Pacific/Rarotonga",
+        "Pacific/Niue",
+        "Pacific/Norfolk",
+        "Pacific/Palau",
+        "Pacific/Port_Moresby",
+        "Pacific/Bougainville",
+        "Pacific/Pitcairn",
+        "Pacific/Pago_Pago",
+        "Pacific/Midway",
+        "Pacific/Apia",
+        "Pacific/Guadalcanal",
+        "Pacific/Fakaofo",
+        "Pacific/Tongatapu",
+        "Pacific/Funafuti",
+        "Pacific/Wake",
+        "Pacific/Efate",
+        "Pacific/Wallis",
+        "Africa/Asmera",
+        "Africa/Timbuktu",
+        "America/Argentina/ComodRivadavia",
+        "America/Atka",
+        "America/Buenos_Aires",
+        "America/Catamarca",
+        "America/Coral_Harbour",
+        "America/Cordoba",
+        "America/Ensenada",
+        "America/Fort_Wayne",
+        "America/Indianapolis",
+        "America/Jujuy",
+        "America/Knox_IN",
+        "America/Louisville",
+        "America/Mendoza",
+        "America/Montreal",
+        "America/Porto_Acre",
+        "America/Rosario",
+        "America/Santa_Isabel",
+        "America/Shiprock",
+        "America/Virgin",
+        "Antarctica/South_Pole",
+        "Asia/Ashkhabad",
+        "Asia/Calcutta",
+        "Asia/Chongqing",
+        "Asia/Chungking",
+        "Asia/Dacca",
+        "Asia/Harbin",
+        "Asia/Kashgar",
+        "Asia/Katmandu",
+        "Asia/Macao",
+        "Asia/Rangoon",
+        "Asia/Saigon",
+        "Asia/Tel_Aviv",
+        "Asia/Thimbu",
+        "Asia/Ujung_Pandang",
+        "Asia/Ulan_Bator",
+        "Atlantic/Faeroe",
+        "Atlantic/Jan_Mayen",
+        "Australia/ACT",
+        "Australia/Canberra",
+        "Australia/LHI",
+        "Australia/NSW",
+        "Australia/North",
+        "Australia/Queensland",
+        "Australia/South",
+        "Australia/Tasmania",
+        "Australia/Victoria",
+        "Australia/West",
+        "Australia/Yancowinna",
+        "Brazil/Acre",
+        "Brazil/DeNoronha",
+        "Brazil/East",
+        "Brazil/West",
+        "Canada/Atlantic",
+        "Canada/Central",
+        "Canada/Eastern",
+        "Canada/Mountain",
+        "Canada/Newfoundland",
+        "Canada/Pacific",
+        "Canada/Saskatchewan",
+        "Canada/Yukon",
+        "Chile/Continental",
+        "Chile/EasterIsland",
+        "Cuba",
+        "Egypt",
+        "Eire",
+        "Etc/UCT",
+        "Europe/Belfast",
+        "Europe/Tiraspol",
+        "GB",
+        "GB-Eire",
+        "GMT+0",
+        "GMT-0",
+        "GMT0",
+        "Greenwich",
+        "Hongkong",
+        "Iceland",
+        "Iran",
+        "Israel",
+        "Jamaica",
+        "Japan",
+        "Kwajalein",
+        "Libya",
+        "Mexico/BajaNorte",
+        "Mexico/BajaSur",
+        "Mexico/General",
+        "NZ",
+        "NZ-CHAT",
+        "Navajo",
+        "PRC",
+        "Pacific/Johnston",
+        "Pacific/Ponape",
+        "Pacific/Samoa",
+        "Pacific/Truk",
+        "Pacific/Yap",
+        "Poland",
+        "Portugal",
+        "ROC",
+        "ROK",
+        "Singapore",
+        "Turkey",
+        "UCT",
+        "US/Alaska",
+        "US/Aleutian",
+        "US/Arizona",
+        "US/Central",
+        "US/East-Indiana",
+        "US/Eastern",
+        "US/Hawaii",
+        "US/Indiana-Starke",
+        "US/Michigan",
+        "US/Mountain",
+        "US/Pacific",
+        "US/Samoa",
+        "UTC",
+        "Universal",
+        "W-SU",
+        "Zulu",
+        "Etc/GMT",
+        "Etc/UTC",
+        "GMT",
+        "Etc/Universal",
+        "Etc/Zulu",
+        "Etc/Greenwich",
+        "Etc/GMT-0",
+        "Etc/GMT+0",
+        "Etc/GMT0",
+        "Etc/GMT-14",
+        "Etc/GMT-13",
+        "Etc/GMT-12",
+        "Etc/GMT-11",
+        "Etc/GMT-10",
+        "Etc/GMT-9",
+        "Etc/GMT-8",
+        "Etc/GMT-7",
+        "Etc/GMT-6",
+        "Etc/GMT-5",
+        "Etc/GMT-4",
+        "Etc/GMT-3",
+        "Etc/GMT-2",
+        "Etc/GMT-1",
+        "Etc/GMT+1",
+        "Etc/GMT+2",
+        "Etc/GMT+3",
+        "Etc/GMT+4",
+        "Etc/GMT+5",
+        "Etc/GMT+6",
+        "Etc/GMT+7",
+        "Etc/GMT+8",
+        "Etc/GMT+9",
+        "Etc/GMT+10",
+        "Etc/GMT+11",
+        "Etc/GMT+12",
+        "Europe/London",
+        "Europe/Jersey",
+        "Europe/Guernsey",
+        "Europe/Isle_of_Man",
+        "Europe/Dublin",
+        "WET",
+        "CET",
+        "MET",
+        "EET",
+        "Europe/Tirane",
+        "Europe/Andorra",
+        "Europe/Vienna",
+        "Europe/Minsk",
+        "Europe/Brussels",
+        "Europe/Sofia",
+        "Europe/Prague",
+        "Europe/Copenhagen",
+        "Atlantic/Faroe",
+        "America/Danmarkshavn",
+        "America/Scoresbysund",
+        "America/Godthab",
+        "America/Thule",
+        "Europe/Tallinn",
+        "Europe/Helsinki",
+        "Europe/Mariehamn",
+        "Europe/Paris",
+        "Europe/Berlin",
+        "Europe/Busingen",
+        "Europe/Gibraltar",
+        "Europe/Athens",
+        "Europe/Budapest",
+        "Atlantic/Reykjavik",
+        "Europe/Rome",
+        "Europe/Vatican",
+        "Europe/San_Marino",
+        "Europe/Riga",
+        "Europe/Vaduz",
+        "Europe/Vilnius",
+        "Europe/Luxembourg",
+        "Europe/Malta",
+        "Europe/Chisinau",
+        "Europe/Monaco",
+        "Europe/Amsterdam",
+        "Europe/Oslo",
+        "Arctic/Longyearbyen",
+        "Europe/Warsaw",
+        "Europe/Lisbon",
+        "Atlantic/Azores",
+        "Atlantic/Madeira",
+        "Europe/Bucharest",
+        "Europe/Kaliningrad",
+        "Europe/Moscow",
+        "Europe/Simferopol",
+        "Europe/Astrakhan",
+        "Europe/Volgograd",
+        "Europe/Saratov",
+        "Europe/Kirov",
+        "Europe/Samara",
+        "Europe/Ulyanovsk",
+        "Asia/Yekaterinburg",
+        "Asia/Omsk",
+        "Asia/Barnaul",
+        "Asia/Novosibirsk",
+        "Asia/Tomsk",
+        "Asia/Novokuznetsk",
+        "Asia/Krasnoyarsk",
+        "Asia/Irkutsk",
+        "Asia/Chita",
+        "Asia/Yakutsk",
+        "Asia/Vladivostok",
+        "Asia/Khandyga",
+        "Asia/Sakhalin",
+        "Asia/Magadan",
+        "Asia/Srednekolymsk",
+        "Asia/Ust-Nera",
+        "Asia/Kamchatka",
+        "Asia/Anadyr",
+        "Europe/Belgrade",
+        "Europe/Ljubljana",
+        "Europe/Podgorica",
+        "Europe/Sarajevo",
+        "Europe/Skopje",
+        "Europe/Zagreb",
+        "Europe/Bratislava",
+        "Europe/Madrid",
+        "Africa/Ceuta",
+        "Atlantic/Canary",
+        "Europe/Stockholm",
+        "Europe/Zurich",
+        "Europe/Istanbul",
+        "Asia/Istanbul",
+        "Europe/Kiev",
+        "Europe/Uzhgorod",
+        "Europe/Zaporozhye",
+        "Factory",
+        "EST",
+        "MST",
+        "HST",
+        "EST5EDT",
+        "CST6CDT",
+        "MST7MDT",
+        "PST8PDT",
+        "America/New_York",
+        "America/Chicago",
+        "America/North_Dakota/Center",
+        "America/North_Dakota/New_Salem",
+        "America/North_Dakota/Beulah",
+        "America/Denver",
+        "America/Los_Angeles",
+        "America/Juneau",
+        "America/Sitka",
+        "America/Metlakatla",
+        "America/Yakutat",
+        "America/Anchorage",
+        "America/Nome",
+        "America/Adak",
+        "Pacific/Honolulu",
+        "America/Phoenix",
+        "America/Boise",
+        "America/Indiana/Indianapolis",
+        "America/Indiana/Marengo",
+        "America/Indiana/Vincennes",
+        "America/Indiana/Tell_City",
+        "America/Indiana/Petersburg",
+        "America/Indiana/Knox",
+        "America/Indiana/Winamac",
+        "America/Indiana/Vevay",
+        "America/Kentucky/Louisville",
+        "America/Kentucky/Monticello",
+        "America/Detroit",
+        "America/Menominee",
+        "America/St_Johns",
+        "America/Goose_Bay",
+        "America/Halifax",
+        "America/Glace_Bay",
+        "America/Moncton",
+        "America/Blanc-Sablon",
+        "America/Toronto",
+        "America/Thunder_Bay",
+        "America/Nipigon",
+        "America/Rainy_River",
+        "America/Atikokan",
+        "America/Winnipeg",
+        "America/Regina",
+        "America/Swift_Current",
+        "America/Edmonton",
+        "America/Vancouver",
+        "America/Dawson_Creek",
+        "America/Fort_Nelson",
+        "America/Creston",
+        "America/Pangnirtung",
+        "America/Iqaluit",
+        "America/Resolute",
+        "America/Rankin_Inlet",
+        "America/Cambridge_Bay",
+        "America/Yellowknife",
+        "America/Inuvik",
+        "America/Whitehorse",
+        "America/Dawson",
+        "America/Cancun",
+        "America/Merida",
+        "America/Matamoros",
+        "America/Monterrey",
+        "America/Mexico_City",
+        "America/Ojinaga",
+        "America/Chihuahua",
+        "America/Hermosillo",
+        "America/Mazatlan",
+        "America/Bahia_Banderas",
+        "America/Tijuana",
+        "America/Nassau",
+        "America/Barbados",
+        "America/Belize",
+        "Atlantic/Bermuda",
+        "America/Costa_Rica",
+        "America/Havana",
+        "America/Santo_Domingo",
+        "America/El_Salvador",
+        "America/Guatemala",
+        "America/Port-au-Prince",
+        "America/Tegucigalpa",
+        "America/Jamaica",
+        "America/Martinique",
+        "America/Managua",
+        "America/Panama",
+        "America/Cayman",
+        "America/Puerto_Rico",
+        "America/Miquelon",
+        "America/Grand_Turk",
+        "US/Pacific-New",
+        "America/Argentina/Buenos_Aires",
+        "America/Argentina/Cordoba",
+        "America/Argentina/Salta",
+        "America/Argentina/Tucuman",
+        "America/Argentina/La_Rioja",
+        "America/Argentina/San_Juan",
+        "America/Argentina/Jujuy",
+        "America/Argentina/Catamarca",
+        "America/Argentina/Mendoza",
+        "America/Argentina/San_Luis",
+        "America/Argentina/Rio_Gallegos",
+        "America/Argentina/Ushuaia",
+        "America/Aruba",
+        "America/La_Paz",
+        "America/Noronha",
+        "America/Belem",
+        "America/Santarem",
+        "America/Fortaleza",
+        "America/Recife",
+        "America/Araguaina",
+        "America/Maceio",
+        "America/Bahia",
+        "America/Sao_Paulo",
+        "America/Campo_Grande",
+        "America/Cuiaba",
+        "America/Porto_Velho",
+        "America/Boa_Vista",
+        "America/Manaus",
+        "America/Eirunepe",
+        "America/Rio_Branco",
+        "America/Santiago",
+        "America/Punta_Arenas",
+        "Pacific/Easter",
+        "Antarctica/Palmer",
+        "America/Bogota",
+        "America/Curacao",
+        "America/Lower_Princes",
+        "America/Kralendijk",
+        "America/Guayaquil",
+        "Pacific/Galapagos",
+        "Atlantic/Stanley",
+        "America/Cayenne",
+        "America/Guyana",
+        "America/Asuncion",
+        "America/Lima",
+        "Atlantic/South_Georgia",
+        "America/Paramaribo",
+        "America/Port_of_Spain",
+        "America/Anguilla",
+        "America/Antigua",
+        "America/Dominica",
+        "America/Grenada",
+        "America/Guadeloupe",
+        "America/Marigot",
+        "America/Montserrat",
+        "America/St_Barthelemy",
+        "America/St_Kitts",
+        "America/St_Lucia",
+        "America/St_Thomas",
+        "America/St_Vincent",
+        "America/Tortola",
+        "America/Montevideo",
+        "America/Caracas"
+      ]
+    },
+    "public.fsrs_rating": {
+      "name": "fsrs_rating",
+      "schema": "public",
+      "values": [
+        "again",
+        "hard",
+        "good",
+        "easy"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

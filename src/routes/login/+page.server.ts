@@ -3,7 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { auth } from '$lib/server/auth';
 import { APIError } from 'better-auth/api';
 import z from 'zod';
-import { LANGUAGES, TIME_ZONES } from '$lib/constants';
+import { LANGUAGE_CODES, TIME_ZONES } from '$lib/constants';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/db/schema';
 import { generatorParameters } from 'ts-fsrs';
@@ -18,7 +18,7 @@ export const actions = {
 			email: z.email(),
 			password: z.string().min(1),
 			name: z.string().min(1),
-			nativeLanguage: z.enum(LANGUAGES),
+			nativeLanguage: z.enum(LANGUAGE_CODES),
 			timeZone: z.enum(TIME_ZONES)
 		});
 		const formData = await request.formData();

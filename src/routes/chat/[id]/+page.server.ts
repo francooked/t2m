@@ -1,102 +1,100 @@
 import type { Actions, PageServerLoad } from './$types';
 import * as schema from '$lib/server/db/schema';
-import * as authSchema from '$lib/server/db/auth.schema';
 import { db } from '$lib/server/db';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { fail, redirect } from '@sveltejs/kit';
 import z from 'zod';
-import { correctionQueue, replyQueue } from '$lib/server/db/queues';
-import { createClient } from 'redis';
-import { REDIS_URL } from '$env/static/private';
 import { requireUserSession } from '$lib/server/session-user';
+import { processChatTurn } from '$lib/server/chat-turn';
+
+type MessageRewrite = {
+	text: string;
+	index: number;
+};
+
+type BaseMessage = {
+	id: number;
+	content: string;
+	status: 'pending' | 'generating' | 'correcting' | 'complete' | 'failed';
+};
+
+type AssistantMessage = BaseMessage & {
+	role: 'assistant';
+	messageRewrites?: never;
+};
+
+type UserMessage = BaseMessage & {
+	role: 'user';
+	messageRewrites: MessageRewrite[];
+};
+
+type ChatMessage = AssistantMessage | UserMessage;
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const signedInUser = requireUserSession(locals);
 	if (!signedInUser) return redirect(302, '/login');
 
-	const chats = await db
-		.select({ id: schema.chat.id })
-		.from(schema.chat)
-		.where(and(eq(schema.chat.id, parseInt(params.id)), eq(schema.chat.userId, signedInUser.id)));
-	if (chats.length !== 1) return redirect(302, '/chat');
+	const chat = (
+		await db
+			.select({ id: schema.chat.id })
+			.from(schema.chat)
+			.where(and(eq(schema.chat.id, parseInt(params.id)), eq(schema.chat.userId, signedInUser.id)))
+	).at(0);
 
-	const rows = await db
-		.select({
-			id: schema.message.id,
-			role: schema.message.role,
-			content: schema.message.content,
-			status: schema.message.status,
-			correction: {
-				id: schema.correction.id,
-				start: schema.correction.start,
-				end: schema.correction.end,
-				reason: schema.correction.reason
-			},
-			suggestion: {
-				id: schema.suggestion.id,
-				replacement: schema.suggestion.replacement
-			}
-		})
-		.from(schema.message)
-		.leftJoin(schema.correction, eq(schema.message.id, schema.correction.messageId))
-		.leftJoin(schema.suggestion, eq(schema.correction.id, schema.suggestion.correctionId))
-		.where(eq(schema.message.chatId, parseInt(params.id)))
-		.orderBy(schema.message.id, schema.correction.id, schema.suggestion.id);
-
-	let messagesMap: Record<
-		number,
-		{
-			corrections: Record<
-				number,
-				{ suggestions: NonNullable<(typeof rows)[number]['suggestion']>[] } & NonNullable<
-					(typeof rows)[number]['correction']
-				>
-			>;
-		} & Omit<(typeof rows)[number], 'correction' | 'suggestion'>
-	> = {};
-
-	for (let i = 0; i < rows.length; i++) {
-		const row = rows[i];
-		const correction = rows[i].correction;
-		const suggestion = rows[i].suggestion;
-
-		if (!(row.id in messagesMap)) {
-			messagesMap[row.id] = {
-				id: row.id,
-				role: rows[i].role,
-				content: rows[i].content,
-				status: rows[i].status,
-				corrections: {}
-			};
-		}
-
-		if (!correction || !suggestion) continue;
-
-		if (!(correction.id in messagesMap[row.id].corrections)) {
-			messagesMap[row.id].corrections[correction.id] = {
-				id: correction.id,
-				start: correction.start,
-				end: correction.end,
-				reason: correction.reason,
-				suggestions: []
-			};
-		}
-
-		messagesMap[row.id].corrections[correction.id].suggestions.push({
-			id: suggestion.id,
-			replacement: suggestion.replacement
-		});
+	if (!chat) {
+		return redirect(302, '/chat');
 	}
 
-	return {
-		messages: Object.values(messagesMap).map(({ corrections, role, ...rest }) => {
-			if (role === 'user') {
-				return { role, corrections: Object.values(corrections), ...rest };
-			} else {
-				return { role, ...rest };
-			}
-		})
-	};
+	const messages: ChatMessage[] = Array.from(
+		Map.groupBy(
+			await db
+				.select({
+					id: schema.message.id,
+					role: schema.message.role,
+					content: schema.message.content,
+					status: schema.message.status,
+					messageRewrite: {
+						text: schema.messageRewrite.text,
+						index: schema.messageRewrite.index
+					}
+				})
+				.from(schema.message)
+				.leftJoin(schema.messageRewrite, eq(schema.message.id, schema.messageRewrite.messageId))
+				.where(eq(schema.message.chatId, Number(params.id)))
+				.orderBy(schema.message.id),
+			({ id }) => id
+		)
+	).map(([id, records]) => {
+		const firstRecord = records.at(0);
+
+		// This should never happen, but just in case, throw an error.
+		if (!firstRecord) throw new Error('No record found');
+
+		if (firstRecord.role === 'assistant') {
+			return {
+				id: firstRecord.id,
+				role: firstRecord.role,
+				content: firstRecord.content,
+				status: firstRecord.status
+			};
+		}
+
+		return {
+			id: firstRecord.id,
+			role: firstRecord.role,
+			content: firstRecord.content,
+			status: firstRecord.status,
+			messageRewrites: records
+				.reduce((accumulator, { messageRewrite }) => {
+					if (messageRewrite === null) return accumulator;
+					accumulator.push(messageRewrite);
+					return accumulator;
+				}, new Array<NonNullable<(typeof records)[number]['messageRewrite']>>())
+				.toSorted((a, b) => a.index - b.index)
+		};
+	});
+
+	return { messages };
 };
 
 export const actions = {
@@ -110,13 +108,17 @@ export const actions = {
 			chatId: parseInt(formData.get('chat_id')?.toString() ?? '-1'),
 			content: formData.get('content')?.toString() ?? ''
 		});
+
 		if (!success) return fail(400, { code: 'invalid_input' });
 
-		const chats = await db
-			.select({ id: schema.chat.id })
-			.from(schema.chat)
-			.where(and(eq(schema.chat.id, data.chatId), eq(schema.chat.userId, signedInUser.id)));
-		if (chats.length != 1) return fail(400, { code: 'chat_not_found' });
+		const chat = (
+			await db
+				.select({ id: schema.chat.id })
+				.from(schema.chat)
+				.where(and(eq(schema.chat.id, data.chatId), eq(schema.chat.userId, signedInUser.id)))
+		).at(0);
+
+		if (!chat) return fail(400, { code: 'chat_not_found' });
 
 		const newMessages = await db
 			.insert(schema.message)
@@ -126,11 +128,18 @@ export const actions = {
 			])
 			.returning({ id: schema.message.id });
 
-		const redisClient = await createClient({ url: REDIS_URL }).connect();
-		await Promise.all([
-			correctionQueue.add('correct', { messageId: newMessages[0].id, chatId: data.chatId }),
-			replyQueue.add('reply', { messageId: newMessages[1].id, chatId: data.chatId })
-		]);
-		redisClient.destroy();
+		const newUserMessage = newMessages.at(0);
+		const newAssistantMessage = newMessages.at(1);
+
+		if (!newUserMessage || !newAssistantMessage) {
+			return fail(500, { code: 'failed_to_create_messages' });
+		}
+
+		await processChatTurn({
+			userId: signedInUser.id,
+			chatId: data.chatId,
+			userMessageId: newUserMessage.id,
+			assistantMessageId: newAssistantMessage.id
+		});
 	}
 } satisfies Actions;
