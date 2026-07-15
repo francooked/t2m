@@ -1,0 +1,1 @@
+ALTER TABLE "message_rewrite" ADD COLUMN "reason" text NOT NULL;

@@ -88,6 +88,7 @@ export const messageRewrite = pgTable(
 		messageId: integer('message_id').references(() => message.id, { onDelete: 'cascade' }),
 		text: text('text').notNull(),
 		index: integer('index').notNull(),
+		reason: text('reason').notNull(),
 		createdAt: timestamp('created_at').defaultNow().notNull()
 	},
 	(table) => [index('messagerewrite_messageid_idx').on(table.messageId)]

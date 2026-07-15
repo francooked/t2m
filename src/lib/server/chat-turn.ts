@@ -29,7 +29,7 @@ async function parseLlmResponse<T extends z.ZodType>(content: any, schema: T) {
 		const parsed = schema.parse(json);
 		return parsed;
 	} catch (error) {
-		console.log('error:', error);
+		console.log('error:', error, '\noriginal LLM output:', content);
 		throw new ChatTurnError('llm_invalid_response');
 	}
 }
@@ -190,10 +190,11 @@ async function correctUserMessage({
 			const messageRewrites = await tx
 				.insert(schema.messageRewrite)
 				.values(
-					llmResponse.steps.map(({ sentence }, index) => ({
+					llmResponse.steps.map(({ sentence, reason }, index) => ({
 						messageId: userMessageId,
 						text: sentence,
-						index
+						index,
+						reason
 					}))
 				)
 				.returning({ id: schema.messageRewrite.id, text: schema.messageRewrite.text });

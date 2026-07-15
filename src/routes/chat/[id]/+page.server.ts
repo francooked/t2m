@@ -9,6 +9,7 @@ import { processChatTurn } from '$lib/server/chat-turn';
 
 type MessageRewrite = {
 	text: string;
+	reason: string;
 	index: number;
 };
 
@@ -55,6 +56,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 					status: schema.message.status,
 					messageRewrite: {
 						text: schema.messageRewrite.text,
+						reason: schema.messageRewrite.reason,
 						index: schema.messageRewrite.index
 					}
 				})
