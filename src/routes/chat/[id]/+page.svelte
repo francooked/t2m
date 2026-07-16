@@ -2,13 +2,12 @@
 	import type { PageProps } from './$types';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from './$types';
-	import { invalidateAll } from '$app/navigation';
-	import { buildBlame, toGlobalSegments } from '$lib/correction/blame';
 	import { Popover } from 'melt/builders';
 	import { mergeAttrs } from 'melt';
+	import { buildBlame } from '$lib/correction/build-blame';
+	import { traceRewriteHistory } from '$lib/correction/segments';
 
 	const { data, params }: PageProps = $props();
-	let isPageLoading = $state(false);
 	const popover = new Popover();
 	let triggerData = $state<{ reason: string } | null>();
 
@@ -16,23 +15,18 @@
 		data.messages.map((message) => {
 			if (message.role === 'assistant') return message;
 
-			const steps = message.messageRewrites
+			const rewrites = message.messageRewrites
 				.toSorted((a, b) => a.index - b.index)
 				.map(({ text: sentence, reason }) => ({ reason, sentence }));
-			const cells = buildBlame(message.content, steps);
-			const segments = toGlobalSegments(cells, steps);
+			const cells = buildBlame(message.content, rewrites);
+			const segments = traceRewriteHistory(cells, rewrites);
 
 			return {
 				id: message.id,
 				role: message.role,
 				status: message.status,
 				content: message.content,
-				changes: segments.map(({ kind, reason, step, text }) => ({
-					added: kind === 'added',
-					removed: kind === 'removed',
-					value: text,
-					reason
-				}))
+				changes: segments
 			};
 		})
 	);
@@ -48,28 +42,11 @@
 		};
 	};
 
-	// $effect(() => {
-	// 	const statuses = new Set(['pending', 'generating', 'correcting']);
-	// 	if (!data.messages.some(({ status }) => statuses.has(status))) return;
-	// 	console.log('Yeah');
-	// 	const interval = setInterval(async () => {
-	// 		isPageLoading = true;
-	// 		await invalidateAll();
-	// 		isPageLoading = false;
-	// 	}, 1000);
-	// 	return () => clearInterval(interval);
-	// });
-
 	$inspect(messages);
 </script>
 
 <div class="p-2">
-	<h1 class="font-bold underline">
-		Mensajes
-		{#if isPageLoading}
-			<span class="text-gray-400">(Refrescando)</span>
-		{/if}
-	</h1>
+	<h1 class="font-bold underline">Mensajes</h1>
 	{#each messages as message (message.id)}
 		{#if message.role === 'assistant'}
 			<div>
@@ -102,22 +79,22 @@
 
 				{#if message.status === 'complete'}
 					{#each message.changes as change}
-						{#if change.removed}
+						{#if change.kind === 'removed'}
 							<button
 								class="text-red-400 line-through"
 								{...mergeAttrs(popover.trigger, {
 									onclick: () => (triggerData = { reason: change.reason })
-								})}>{change.value}</button
+								})}>{change.text}</button
 							>
-						{:else if change.added}
+						{:else if change.kind === 'added'}
 							<button
 								class="text-green-400"
 								{...mergeAttrs(popover.trigger, {
 									onclick: () => (triggerData = { reason: change.reason })
-								})}>{change.value}</button
+								})}>{change.text}</button
 							>
 						{:else}
-							<span class="">{change.value}</span>
+							<span class="">{change.text}</span>
 						{/if}
 					{:else}
 						<span>{message.content}</span>
