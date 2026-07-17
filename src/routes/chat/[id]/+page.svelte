@@ -58,10 +58,12 @@
 						Error al generar la respuesta
 					{/if}
 				</span>
+
 				{#if message.status === 'failed'}
-					<form method="post" action="?/reply">
-						<button type="submit" class="font-medium">Reintenar</button>
+					<form method="post" action="?/retryReply">
+						<button type="submit" class="font-medium">Reintentar</button>
 						<input type="hidden" name="chat_id" value={params.id} />
+						<input type="hidden" name="message_id" value={message.id} />
 					</form>
 				{/if}
 			</div>
@@ -81,26 +83,34 @@
 					{#each message.changes as change}
 						{#if change.kind === 'removed'}
 							<button
-								class="text-red-400 line-through"
+								class="whitespace-pre-wrap text-red-400 line-through"
 								{...mergeAttrs(popover.trigger, {
 									onclick: () => (triggerData = { reason: change.reason })
 								})}>{change.text}</button
 							>
 						{:else if change.kind === 'added'}
 							<button
-								class="text-green-400"
+								class="whitespace-pre-wrap text-green-400"
 								{...mergeAttrs(popover.trigger, {
 									onclick: () => (triggerData = { reason: change.reason })
 								})}>{change.text}</button
 							>
 						{:else}
-							<span class="">{change.text}</span>
+							<span class="whitespace-pre-wrap">{change.text}</span>
 						{/if}
 					{:else}
 						<span>{message.content}</span>
 					{/each}
 				{:else}
 					<span>{message.content}</span>
+				{/if}
+
+				{#if message.status === 'failed'}
+					<form method="post" action="?/retryCorrection">
+						<button type="submit" class="font-medium">Reintentar</button>
+						<input type="hidden" name="chat_id" value={params.id} />
+						<input type="hidden" name="message_id" value={message.id} />
+					</form>
 				{/if}
 			</div>
 		{/if}
@@ -113,7 +123,7 @@
 	{/if}
 </div>
 
-<form method="post" action="?/reply" class="p-2" use:enhance={handleReply}>
+<form method="post" action="?/replyAndCorrect" class="p-2" use:enhance={handleReply}>
 	<textarea placeholder="¿Cuál es tu respuesta?" name="content"></textarea>
 	<button type="submit" class="font-medium">Enviar</button>
 	<input type="hidden" name="chat_id" value={params.id} />

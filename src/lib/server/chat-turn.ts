@@ -1,7 +1,7 @@
 import * as schema from '$lib/server/db/schema';
 import * as z from 'zod';
 import { db } from '$lib/server/db';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import Groq from 'groq-sdk';
 import { GROQ_API_KEY } from '$env/static/private';
 import {
@@ -28,8 +28,8 @@ async function parseLlmResponse<T extends z.ZodType>(content: any, schema: T) {
 		const json = JSON.parse(content);
 		const parsed = schema.parse(json);
 		return parsed;
-	} catch (error) {
-		console.log('error:', error, '\noriginal LLM output:', content);
+	} catch {
+		console.error('invalid llm response:', content);
 		throw new ChatTurnError('llm_invalid_response');
 	}
 }
@@ -47,6 +47,32 @@ async function updateMessageStatus({
 		.update(schema.message)
 		.set({ status })
 		.where(and(eq(schema.message.chatId, chatId), eq(schema.message.id, messageId)));
+}
+
+async function claimMessage({
+	chatId,
+	messageId,
+	status
+}: {
+	chatId: number;
+	messageId: number;
+	status: typeof schema.message.$inferInsert.status;
+}) {
+	const updatedMessage = (
+		await db
+			.update(schema.message)
+			.set({ status })
+			.where(
+				and(
+					eq(schema.message.chatId, chatId),
+					eq(schema.message.id, messageId),
+					inArray(schema.message.status, ['pending', 'failed'])
+				)
+			)
+			.returning({ id: schema.message.id, status: schema.message.status })
+	).at(0);
+
+	return updatedMessage !== undefined;
 }
 
 async function loadChat({ userId, chatId }: { userId: string; chatId: number }) {
@@ -76,7 +102,8 @@ async function loadChat({ userId, chatId }: { userId: string; chatId: number }) 
 		})
 		.from(schema.message)
 		.innerJoin(schema.chat, eq(schema.message.chatId, schema.chat.id))
-		.where(and(eq(schema.chat.userId, userId), eq(schema.chat.id, chatId)));
+		.where(and(eq(schema.chat.userId, userId), eq(schema.chat.id, chatId)))
+		.orderBy(schema.message.id);
 
 	// Even if the chat is new, there should be at least two messages: one user message and one assistant message.
 	// They are both pending.
@@ -94,8 +121,7 @@ async function replyUserMessage({
 	assistantMessageId
 }: { userMessageId: number; assistantMessageId: number } & Awaited<ReturnType<typeof loadChat>>) {
 	const userMessage = messages.find(
-		(message) =>
-			message.id === userMessageId && message.role === 'user' && message.status === 'pending'
+		(message) => message.id === userMessageId && message.role === 'user'
 	);
 
 	const assistantMessage = messages.find(
@@ -106,11 +132,14 @@ async function replyUserMessage({
 		throw new ChatTurnError('messages_not_found');
 	}
 
-	await updateMessageStatus({
+	const claimed = await claimMessage({
 		chatId: chat.id,
 		messageId: assistantMessage.id,
 		status: 'generating'
 	});
+
+	// Another task has already claimed this message.
+	if (!claimed) return;
 
 	const chatCompletion = await groqClient.chat.completions.create({
 		messages: replyPrompts(
@@ -147,8 +176,7 @@ async function correctUserMessage({
 	assistantMessageId
 }: { userMessageId: number; assistantMessageId: number } & Awaited<ReturnType<typeof loadChat>>) {
 	const userMessage = messages.find(
-		(message) =>
-			message.id === userMessageId && message.role === 'user' && message.status === 'pending'
+		(message) => message.id === userMessageId && message.role === 'user'
 	);
 
 	const assistantMessage = messages.find(
@@ -159,11 +187,14 @@ async function correctUserMessage({
 		throw new ChatTurnError('messages_not_found');
 	}
 
-	await updateMessageStatus({
+	const claimed = await claimMessage({
 		chatId: chat.id,
 		messageId: userMessage.id,
 		status: 'correcting'
 	});
+
+	// Another task has already claimed this message.
+	if (!claimed) return;
 
 	const chatCompletion = await groqClient.chat.completions.create({
 		messages: buildMessageCorrectionPrompt({
@@ -185,52 +216,73 @@ async function correctUserMessage({
 		messageCorrectionOutputSchema
 	);
 
-	if (llmResponse.steps.length > 0) {
-		await db.transaction(async (tx) => {
-			const messageRewrites = await tx
-				.insert(schema.messageRewrite)
-				.values(
-					llmResponse.steps.map(({ sentence, reason }, index) => ({
-						messageId: userMessageId,
-						text: sentence,
-						index,
-						reason
-					}))
-				)
-				.returning({ id: schema.messageRewrite.id, text: schema.messageRewrite.text });
-			const lastMessageRewrite = messageRewrites.at(-1);
-
-			if (!lastMessageRewrite) throw new ChatTurnError('persist_failed');
-
-			const front = userMessage.content;
-			const back = lastMessageRewrite.text;
-			const extra = llmResponse.translation;
-
-			const exercise = (
-				await tx
-					.insert(schema.exercise)
-					.values({
-						userId: chat.userId,
-						targetLanguage: chat.targetLanguage,
-						type: 'full_answer',
-						version: 1,
-						source: { messageRewriteId: lastMessageRewrite.id },
-						payload: { front, back, extra }
-					})
-					.returning({ id: schema.exercise.id })
-			).at(0);
-
-			if (!exercise) throw new ChatTurnError('persist_failed');
+	if (llmResponse.steps.length === 0) {
+		await updateMessageStatus({
+			chatId: chat.id,
+			messageId: userMessage.id,
+			status: 'complete'
 		});
+		return;
 	}
 
-	console.log('llmResponse', JSON.stringify(llmResponse));
+	await db.transaction(async (tx) => {
+		const messageRewrites = await tx
+			.insert(schema.messageRewrite)
+			.values(
+				llmResponse.steps.map(({ sentence, reason }, index) => ({
+					messageId: userMessageId,
+					text: sentence,
+					index,
+					reason
+				}))
+			)
+			.returning({ id: schema.messageRewrite.id, text: schema.messageRewrite.text });
 
-	await updateMessageStatus({
-		chatId: chat.id,
-		messageId: userMessage.id,
-		status: 'complete'
+		const lastMessageRewrite = messageRewrites.at(-1);
+		if (!lastMessageRewrite) throw new ChatTurnError('persist_failed');
+
+		const front = userMessage.content;
+		const back = lastMessageRewrite.text;
+		const extra = llmResponse.translation;
+
+		const exercise = (
+			await tx
+				.insert(schema.exercise)
+				.values({
+					userId: chat.userId,
+					targetLanguage: chat.targetLanguage,
+					type: 'full_answer',
+					version: 1,
+					source: { messageRewriteId: lastMessageRewrite.id },
+					payload: { front, back, extra }
+				})
+				.returning({ id: schema.exercise.id })
+		).at(0);
+
+		if (!exercise) throw new ChatTurnError('persist_failed');
+
+		await tx
+			.update(schema.message)
+			.set({ status: 'complete' })
+			.where(and(eq(schema.message.chatId, chat.id), eq(schema.message.id, userMessage.id)));
 	});
+}
+
+async function runMessageTask({
+	chatId,
+	messageId,
+	task
+}: {
+	chatId: number;
+	messageId: number;
+	task: () => Promise<void>;
+}) {
+	try {
+		await task();
+	} catch (error) {
+		console.error('chat task failed:', error);
+		await updateMessageStatus({ chatId, messageId, status: 'failed' });
+	}
 }
 
 export async function processChatTurn({
@@ -246,7 +298,75 @@ export async function processChatTurn({
 }) {
 	const { chat, messages } = await loadChat({ userId, chatId });
 	await Promise.all([
-		replyUserMessage({ chat, messages, assistantMessageId, userMessageId }),
-		correctUserMessage({ chat, messages, assistantMessageId, userMessageId })
+		runMessageTask({
+			chatId,
+			messageId: assistantMessageId,
+			task: () => replyUserMessage({ chat, messages, assistantMessageId, userMessageId })
+		}),
+		runMessageTask({
+			chatId,
+			messageId: userMessageId,
+			task: () => correctUserMessage({ chat, messages, assistantMessageId, userMessageId })
+		})
 	]);
+}
+
+export async function retryReply({
+	userId,
+	chatId,
+	assistantMessageId
+}: {
+	userId: string;
+	chatId: number;
+	assistantMessageId: number;
+}) {
+	const { chat, messages } = await loadChat({ userId, chatId });
+	const assistantMessageIndex = messages.findIndex(({ id }) => id === assistantMessageId);
+
+	if (assistantMessageIndex === -1) {
+		throw new ChatTurnError('messages_not_found');
+	}
+
+	const userMessage = messages.at(assistantMessageIndex - 1);
+
+	if (userMessage?.role !== 'user') {
+		throw new ChatTurnError('messages_not_found');
+	}
+
+	await runMessageTask({
+		chatId,
+		messageId: assistantMessageId,
+		task: () =>
+			replyUserMessage({ chat, messages, assistantMessageId, userMessageId: userMessage.id })
+	});
+}
+
+export async function retryCorrection({
+	userId,
+	chatId,
+	userMessageId
+}: {
+	userId: string;
+	chatId: number;
+	userMessageId: number;
+}) {
+	const { chat, messages } = await loadChat({ userId, chatId });
+	const userMessageIndex = messages.findIndex(({ id }) => id === userMessageId);
+
+	if (userMessageIndex === -1) {
+		throw new ChatTurnError('messages_not_found');
+	}
+
+	const assistantMessage = messages.at(userMessageIndex + 1);
+
+	if (assistantMessage?.role !== 'assistant') {
+		throw new ChatTurnError('messages_not_found');
+	}
+
+	await runMessageTask({
+		chatId,
+		messageId: userMessageId,
+		task: () =>
+			correctUserMessage({ chat, messages, userMessageId, assistantMessageId: assistantMessage.id })
+	});
 }

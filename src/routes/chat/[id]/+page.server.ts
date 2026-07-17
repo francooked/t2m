@@ -5,7 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { fail, redirect } from '@sveltejs/kit';
 import z from 'zod';
 import { requireUserSession } from '$lib/server/session-user';
-import { processChatTurn } from '$lib/server/chat-turn';
+import { ChatTurnError, processChatTurn, retryCorrection, retryReply } from '$lib/server/chat-turn';
 
 type MessageRewrite = {
 	text: string;
@@ -100,7 +100,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions = {
-	reply: async ({ request, locals }) => {
+	replyAndCorrect: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
 		if (!signedInUser) return redirect(302, '/chat');
 
@@ -137,11 +137,64 @@ export const actions = {
 			return fail(500, { code: 'failed_to_create_messages' });
 		}
 
-		await processChatTurn({
-			userId: signedInUser.id,
-			chatId: data.chatId,
-			userMessageId: newUserMessage.id,
-			assistantMessageId: newAssistantMessage.id
+		try {
+			await processChatTurn({
+				userId: signedInUser.id,
+				chatId: data.chatId,
+				userMessageId: newUserMessage.id,
+				assistantMessageId: newAssistantMessage.id
+			});
+		} catch (error) {
+			if (error instanceof ChatTurnError) return fail(400, { code: error.code });
+			throw error;
+		}
+	},
+	retryReply: async ({ request, locals }) => {
+		const signedInUser = requireUserSession(locals);
+		if (!signedInUser) return redirect(302, '/chat');
+
+		const formData = await request.formData();
+		const zodSchema = z.object({ chatId: z.number().positive(), messageId: z.number().positive() });
+		const { success, data } = zodSchema.safeParse({
+			chatId: parseInt(formData.get('chat_id')?.toString() ?? '-1'),
+			messageId: parseInt(formData.get('message_id')?.toString() ?? '-1')
 		});
+
+		if (!success) return fail(400, { code: 'invalid_input' });
+
+		try {
+			await retryReply({
+				userId: signedInUser.id,
+				chatId: data.chatId,
+				assistantMessageId: data.messageId
+			});
+		} catch (error) {
+			if (error instanceof ChatTurnError) return fail(400, { code: error.code });
+			throw error;
+		}
+	},
+	retryCorrection: async ({ request, locals }) => {
+		const signedInUser = requireUserSession(locals);
+		if (!signedInUser) return redirect(302, '/chat');
+
+		const formData = await request.formData();
+		const zodSchema = z.object({ chatId: z.number().positive(), messageId: z.number().positive() });
+		const { success, data } = zodSchema.safeParse({
+			chatId: parseInt(formData.get('chat_id')?.toString() ?? '-1'),
+			messageId: parseInt(formData.get('message_id')?.toString() ?? '-1')
+		});
+
+		if (!success) return fail(400, { code: 'invalid_input' });
+
+		try {
+			await retryCorrection({
+				userId: signedInUser.id,
+				chatId: data.chatId,
+				userMessageId: data.messageId
+			});
+		} catch (error) {
+			if (error instanceof ChatTurnError) return fail(400, { code: error.code });
+			throw error;
+		}
 	}
 } satisfies Actions;
