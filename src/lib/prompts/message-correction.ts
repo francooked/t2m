@@ -6,6 +6,7 @@ import { LANGUAGE_CODE_LABELS, LANGUAGE_CODES } from '$lib/constants';
 import dedent from 'dedent';
 import * as z from 'zod';
 import type { ChatCompletionSystemMessageParam } from 'groq-sdk/resources/chat.mjs';
+import { normalizeText } from '$lib/correction/normalize-text';
 
 export const inputSchema = z.object({
 	nativeLanguage: z.enum(LANGUAGE_CODES),
@@ -14,7 +15,16 @@ export const inputSchema = z.object({
 });
 
 export const outputSchema = z.object({
-	steps: z.array(z.object({ sentence: z.string().min(1), reason: z.string().min(1) })),
+	steps: z.array(
+		z.object({
+			sentence: z
+				.string()
+				.trim()
+				.min(1)
+				.transform((sentence) => normalizeText(sentence)),
+			reason: z.string().min(1)
+		})
+	),
 	translation: z.string().min(1)
 });
 
@@ -331,104 +341,6 @@ export const buildPrompt = (
 	return [
 		{
 			role: 'system',
-			// v0.1
-			// content: dedent`
-			// 	Recibirás un historial de mensajes en un idioma objetivo "targetLanguage", escritos por alguien cuyo idioma nativo es "nativeLanguage".
-			// 	Tu tarea es corregir solo el último mensaje del historial, con el mínimo de cambios para que suene natural en el idioma objetivo.
-
-			// 	Divide la corrección en "steps": cada "step" es una versión del mensaje un poco más corregida que la anterior, hasta llegar a una versión completamente natural.
-			// 	Cada "step" corrige errores de un mismo tipo. Ordena los steps del error más importante (afecta el significado) al más superficial (tildes, ortografía, puntuación).
-
-			// 	"reason" es una explicación breve, en "nativeLanguage", de qué se corrigió en ese step (ej: "faltaba la preposición 'a'"). No uses categorías ni códigos, solo una frase corta y clara.
-
-			// 	Reglas:
-			// 	- Si el mismo error aparece más de una vez en la frase, corrígelo todo en un solo step, no lo repitas en steps distintos.
-			// 	- Si el mensaje ya es correcto, "steps" debe estar vacío.
-			// 	- No agregues cambios de estilo que no sean errores reales.
-
-			// 	Salida JSON:
-
-			// 	{
-			// 		"steps": [{ "sentence": "...", "reason": "..." }]
-			// 	}
-			// `
-			// v0.2
-			// content: dedent`
-			// 	Recibirás un historial de mensajes en un idioma objetivo "targetLanguage", escritos por alguien cuyo idioma nativo es "nativeLanguage".
-			// 	Tu tarea es corregir solo el último mensaje del historial, con el mínimo de cambios para que suene natural en el idioma objetivo.
-
-			// 	La corrección es una secuencia de "steps". Cada "step" se construye corrigiendo el "step" INMEDIATAMENTE ANTERIOR, no el mensaje original:
-			// 	- steps[0] corrige el mensaje original.
-			// 	- steps[n] corrige steps[n-1] (no el mensaje original).
-			// 	- El texto de steps[n] debe ser igual al de steps[n-1], excepto por los cambios de ese step. No reintroduzcas ni cambies nada que ya haya quedado corregido en un step anterior.
-			// 	- El último step es la versión completamente natural del mensaje.
-
-			// 	Cada "step" corrige errores de un mismo tipo. Ordena los steps del error más importante (afecta el significado) al más superficial (tildes, ortografía, puntuación).
-
-			// 	Reglas:
-			// 	- Si el mismo error aparece más de una vez en la frase, corrígelo todo en un solo step, no lo repitas en steps distintos.
-			// 	- Si el mensaje ya es correcto, "steps" debe estar vacío.
-			// 	- No agregues cambios de estilo que no sean errores reales.
-
-			// 	Salida JSON:
-
-			// 	{
-			// 		"steps": [{ "sentence": "...", "reason": "..." }]
-			// 	}
-			// `
-			// v0.3
-			// content: dedent`
-			// 	Recibirás un historial de mensajes en un idioma objetivo "targetLanguage", escritos por alguien cuyo idioma nativo es "nativeLanguage".
-			// 	Tu tarea es corregir solo el último mensaje del historial, con el mínimo de cambios para que suene natural en el idioma objetivo "targetLanguage".
-
-			// 	La corrección es una secuencia de "steps". Cada "step" corrige errores de un mismo tipo y están ordenados por importancia (afectan el significado), así:
-			// 	- steps[0] corrige los errores más críticos (de la misma categoría) del mensaje original.
-			// 	- steps[1] corrige los segundos errores más críticos (de la misma categoría) de steps[0].
-			// 	- steps[2] corrige los terceros errores más críticos (de la misma categoría) de steps[1], y así sucesivamente.
-			// 	- El último "step" corrige los últimos errores más críticos (de la misma categoría) del penúltimo "step", dando lugar a un mensaje completamente corregido y natural, con el mínimo de cambios.
-
-			// 	Cada "step" está acompañado de un "reason" escrito en "nativeLanguage" que describe la razón del cambio de manera breve.
-			// 	Una categoría de error es única entre todos los "steps".
-
-			// 	Reglas:
-			// 	- Si el mensaje ya es correcto, "steps" debe ser una lista vacía.
-			// 	- No agregues cambios de estilo que no sean errores reales.
-			// 	- "reason" justifica brevemente el cambio (en el idioma "nativeLanguage").
-			// 	- "translation" es la traducción del mensaje (en el idioma nativo "nativeLanguage").
-
-			// 	Salida JSON (obligatoria):
-			// 	{
-			// 		"steps": [{ "sentence": "...", "reason": "..." }],
-			// 		"translation": "..."
-			// 	}
-			// `
-			// v0.4 (no funciona bien)
-			// content: dedent`
-			// 	Recibirás un historial de mensajes en un idioma objetivo "targetLanguage", escritos por alguien cuyo idioma nativo es "nativeLanguage".
-			// 	Tu tarea es corregir solo el último mensaje del historial, con el mínimo de cambios para que suene natural en el idioma objetivo "targetLanguage".
-
-			// 	La corrección es una secuencia de "steps", ordenados del error más importante (afecta el significado) al más superficial (tildes, ortografía, puntuación). Cada "step" corrige una única categoría de error, distinta a la de cualquier otro step.
-			// 	- steps[0] corrige el mensaje original.
-			// 	- steps[n] (n > 0) corrige steps[n-1], no el mensaje original.
-			// 	- El texto de steps[n] debe ser idéntico al de steps[n-1] excepto por el cambio de ese step.
-			// 	- El último step es el mensaje completamente corregido y natural.
-
-			// 	Cada "step" está acompañado de un "reason" escrito en "nativeLanguage" que describe la razón del cambio de manera breve.
-			// 	Una categoría de error es única entre todos los "steps".
-
-			// 	Reglas:
-			// 	- Si el mensaje ya es correcto, "steps" debe ser una lista vacía.
-			// 	- No agregues cambios de estilo que no sean errores reales.
-			// 	- Entrega un "reason" breve que describa el error en el idioma nativo "nativeLanguage".
-			// 	- "translation" es la traducción del mensaje en el idioma nativo "nativeLanguage".
-
-			// 	Salida JSON (obligatoria):
-			// 	{
-			// 		"steps": [{ "sentence": "...", "reason": "..." }],
-			// 		"translation": "..."
-			// 	}
-			// `
-			//v0.5
 			content: dedent`
 				Recibirás un historial de mensajes en un idioma objetivo "targetLanguage", escritos por alguien cuyo idioma nativo es "nativeLanguage".
 				Tu tarea es corregir solo el último mensaje del historial, con el mínimo de cambios para que suene natural en el idioma objetivo "targetLanguage".

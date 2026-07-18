@@ -6,12 +6,9 @@ import { fail, redirect } from '@sveltejs/kit';
 import z from 'zod';
 import { requireUserSession } from '$lib/server/session-user';
 import { ChatTurnError, processChatTurn, retryCorrection, retryReply } from '$lib/server/chat-turn';
-
-type MessageRewrite = {
-	text: string;
-	reason: string;
-	index: number;
-};
+import { normalizeText } from '$lib/correction/normalize-text';
+import { buildBlame } from '$lib/correction/build-blame';
+import { traceRewriteHistory, type Segment } from '$lib/correction/segments';
 
 type BaseMessage = {
 	id: number;
@@ -21,12 +18,12 @@ type BaseMessage = {
 
 type AssistantMessage = BaseMessage & {
 	role: 'assistant';
-	messageRewrites?: never;
+	rewriteHistory?: never;
 };
 
 type UserMessage = BaseMessage & {
 	role: 'user';
-	messageRewrites: MessageRewrite[];
+	rewriteHistory: Segment[];
 };
 
 type ChatMessage = AssistantMessage | UserMessage;
@@ -81,18 +78,27 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			};
 		}
 
+		const rewrites = records
+			.reduce((accumulator, { messageRewrite }) => {
+				if (messageRewrite === null) return accumulator;
+				accumulator.push({
+					index: messageRewrite.index,
+					reason: messageRewrite.reason,
+					sentence: messageRewrite.text
+				});
+				return accumulator;
+			}, new Array<{ index: number; reason: string; sentence: string }>())
+			.toSorted((a, b) => a.index - b.index);
+
+		const cells = buildBlame(firstRecord.content, rewrites);
+		const rewriteHistory = traceRewriteHistory(cells, rewrites);
+
 		return {
 			id: firstRecord.id,
 			role: firstRecord.role,
 			content: firstRecord.content,
 			status: firstRecord.status,
-			messageRewrites: records
-				.reduce((accumulator, { messageRewrite }) => {
-					if (messageRewrite === null) return accumulator;
-					accumulator.push(messageRewrite);
-					return accumulator;
-				}, new Array<NonNullable<(typeof records)[number]['messageRewrite']>>())
-				.toSorted((a, b) => a.index - b.index)
+			rewriteHistory
 		};
 	});
 
@@ -105,7 +111,14 @@ export const actions = {
 		if (!signedInUser) return redirect(302, '/chat');
 
 		const formData = await request.formData();
-		const zodSchema = z.object({ chatId: z.number().positive(), content: z.string().min(1) });
+		const zodSchema = z.object({
+			chatId: z.number().positive(),
+			content: z
+				.string()
+				.trim()
+				.min(1)
+				.transform((content) => normalizeText(content))
+		});
 		const { success, data } = zodSchema.safeParse({
 			chatId: parseInt(formData.get('chat_id')?.toString() ?? '-1'),
 			content: formData.get('content')?.toString() ?? ''

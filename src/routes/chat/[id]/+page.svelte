@@ -4,50 +4,30 @@
 	import type { SubmitFunction } from './$types';
 	import { Popover } from 'melt/builders';
 	import { mergeAttrs } from 'melt';
-	import { buildBlame } from '$lib/correction/build-blame';
-	import { traceRewriteHistory } from '$lib/correction/segments';
 
 	const { data, params }: PageProps = $props();
 	const popover = new Popover();
+	let submitting = $state(false);
 	let triggerData = $state<{ reason: string } | null>();
 
-	const messages = $derived(
-		data.messages.map((message) => {
-			if (message.role === 'assistant') return message;
-
-			const rewrites = message.messageRewrites
-				.toSorted((a, b) => a.index - b.index)
-				.map(({ text: sentence, reason }) => ({ reason, sentence }));
-			const cells = buildBlame(message.content, rewrites);
-			const segments = traceRewriteHistory(cells, rewrites);
-
-			return {
-				id: message.id,
-				role: message.role,
-				status: message.status,
-				content: message.content,
-				changes: segments
-			};
-		})
-	);
-
-	const handleReply: SubmitFunction = async () => {
+	const handleReplyAndCorrect: SubmitFunction = async () => {
+		submitting = true;
 		return async ({ result, update }) => {
-			if (result.type === 'success') {
-				console.log('success:', result.data);
+			if (result.type === 'failure' || result.type === 'error') {
+				console.error('retry reply failed:', result);
+			} else {
 				await update();
-			} else if (result.type === 'error') {
-				console.log('error:', result);
 			}
+			submitting = false;
 		};
 	};
 
-	$inspect(messages);
+	$inspect(data.messages);
 </script>
 
 <div class="p-2">
 	<h1 class="font-bold underline">Mensajes</h1>
-	{#each messages as message (message.id)}
+	{#each data.messages as message (message.id)}
 		{#if message.role === 'assistant'}
 			<div>
 				<span class="">Asistente:</span>
@@ -80,23 +60,38 @@
 				{/if}
 
 				{#if message.status === 'complete'}
-					{#each message.changes as change}
+					{#each message.rewriteHistory as change, index}
 						{#if change.kind === 'removed'}
-							<button
-								class="whitespace-pre-wrap text-red-400 line-through"
-								{...mergeAttrs(popover.trigger, {
-									onclick: () => (triggerData = { reason: change.reason })
-								})}>{change.text}</button
-							>
+							{#if change.text.trim() === ''}
+								<span>{change.text}</span>
+							{:else}
+								<button
+									class="text-red-400 line-through"
+									{...mergeAttrs(popover.trigger, {
+										onclick: () => (triggerData = { reason: change.reason })
+									})}
+								>
+									{change.text}
+								</button>
+								{#if /[\p{L}\p{N}]+/gu.test(message.rewriteHistory.at(index + 1)?.text ?? '')}
+									<span>{' '}</span>
+								{/if}
+							{/if}
 						{:else if change.kind === 'added'}
-							<button
-								class="whitespace-pre-wrap text-green-400"
-								{...mergeAttrs(popover.trigger, {
-									onclick: () => (triggerData = { reason: change.reason })
-								})}>{change.text}</button
-							>
+							{#if change.text.trim() === ''}
+								<span>{change.text}</span>
+							{:else}
+								<button
+									class=" text-green-400"
+									{...mergeAttrs(popover.trigger, {
+										onclick: () => (triggerData = { reason: change.reason })
+									})}
+								>
+									{change.text}
+								</button>
+							{/if}
 						{:else}
-							<span class="whitespace-pre-wrap">{change.text}</span>
+							<span class="">{change.text}</span>
 						{/if}
 					{:else}
 						<span>{message.content}</span>
@@ -123,8 +118,10 @@
 	{/if}
 </div>
 
-<form method="post" action="?/replyAndCorrect" class="p-2" use:enhance={handleReply}>
+<form method="post" action="?/replyAndCorrect" class="p-2" use:enhance={handleReplyAndCorrect}>
 	<textarea placeholder="¿Cuál es tu respuesta?" name="content"></textarea>
-	<button type="submit" class="font-medium">Enviar</button>
+	<button type="submit" class="font-medium" disabled={submitting}
+		>{submitting ? 'Enviando' : 'Enviar'}</button
+	>
 	<input type="hidden" name="chat_id" value={params.id} />
 </form>

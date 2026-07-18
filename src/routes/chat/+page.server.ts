@@ -8,6 +8,7 @@ import z from 'zod';
 import { LANGUAGE_CODES } from '$lib/constants';
 import { requireUserSession } from '$lib/server/session-user';
 import { processChatTurn } from '$lib/server/chat-turn';
+import { normalizeText } from '$lib/correction/normalize-text';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const signedInUser = requireUserSession(locals);
@@ -48,7 +49,11 @@ export const actions = {
 
 		const formData = await request.formData();
 		const zodSchema = z.object({
-			content: z.string().min(1),
+			content: z
+				.string()
+				.trim()
+				.min(1)
+				.transform((content) => normalizeText(content)),
 			targetLanguage: z.enum(LANGUAGE_CODES).refine((code) => code !== userProfile.nativeLanguage, {
 				error: 'You cannot chat in your native language'
 			})

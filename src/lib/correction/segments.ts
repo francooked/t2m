@@ -1,6 +1,4 @@
 import type { Cell, Rewrite } from './build-blame';
-import { lcs } from './lcs';
-import { tokenize } from './tokenize';
 
 export type Segment =
 	| {
@@ -42,12 +40,4 @@ export function traceRewriteHistory(cells: Cell[], rewrites: Rewrite[]): Segment
 	}
 
 	return segments;
-}
-
-export function toStepDifferences(original: string, rewrites: Rewrite[]) {
-	const sentences = [original, ...rewrites.map((step) => step.sentence)];
-	return rewrites.map((rewrite, i) => ({
-		reason: rewrite.reason,
-		operations: lcs(tokenize(sentences[i]), tokenize(sentences[i + 1]))
-	}));
 }
