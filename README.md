@@ -187,3 +187,112 @@ Recursos:
 - [ ] si no se entiende el mensaje del usuario, no crear un ejercicio al tiro, sino preguntar qué quiso decir y recién ahí corregir (si aplica) pero añadiendo la traducción
 - [ ] A veces la oración que dice un usuario es parcialmente correcta y podría clarificarse cuando sí se dice de su manera. Ejemplo, "voy en el gimnasio" en realidad se dice "voy al gimnasio", pero decir "voy en el" se podría completar como "voy en el auto".
 - [ ] Agregar lo que realmente se entiende con lo que dijo vs lo que realmente quiso decir, ejemplo, "la comida es fría" da a entender que la comida fuera una persona con sentimientos, que es diferente a decir "la comida ESTÁ fría"
+
+## One shotss
+
+Esperaría que le modelo pudiera corregir esto:
+
+Yo soy muy cansado hoy.
+[1:Yo] soy muy cansado hoy.
+[1:Estoy] muy cansado hoy.
+
+Tengo 25 años viejo.
+Tengo 25 años [1:viejo].
+Tengo 25 años.
+
+Estoy aquí desde tres años.
+[1:Estoy] aquí [1:desde] tres años.
+[1:Llevo] aquí tres años.
+
+Yo gusto este restaurante.
+[1:Yo gusto] este restaurante.
+[1:Me gusta] este restaurante.
+
+Estoy excitado para el viaje.
+Estoy [1:excitado para] el viaje.
+Estoy [1:emocionado por] el viaje.
+
+Necesito practicar mi español más.
+Necesito practicar mi español [1:más].
+Necesito practicar [1:más] mi español.
+
+(redundante)
+Estoy buscando para mi teléfono.
+Estoy [1:buscando para] mi teléfono.
+Estoy [1:buscando] mi teléfono.
+
+(redundante)
+Hice un error.
+[1:Hice] un error.
+[1:Cometí] un error.
+
+Ella explicó me el problema.
+Ella [1:explicó me] el problema.
+Ella [1:me explicó] el problema.
+
+(redundante)
+Voy a llamar tú mañana.
+Voy a [1:llamar tú] mañana.
+Voy a [1:llamarte] mañana.
+
+(redundante)
+¿Cómo se ve como?
+¿Cómo [1:se ve como]?
+¿Cómo [1:es]?
+
+(redundante)
+Yo no entiendo qué quieres decir por eso.
+Yo no entiendo qué quieres [1:decir por] eso.
+Yo no entiendo qué quieres [1:decir con] eso.
+
+Estoy aprendiendo español por dos años.
+[1:Estoy] aprendiendo español [2:por] [3:dos años].
+[1:Llevo] [3:dos años] aprendiendo español.
+
+(redundante)
+Tengo hambre mucho.
+Tengo [1:hambre mucho].
+Tengo [1:mucha hambre].
+
+Te extraño mucho también.
+Te extraño mucho [1:también].
+[1:Yo también] te extraño mucho.
+
+¿Puedo tener una cerveza, por favor?
+¿[1:Puedo tener] una cerveza, por favor?
+¿[1:Me puede dar] una cerveza, por favor?
+
+Voy a tomar una ducha rápido.
+Voy a [1:tomar] una ducha [2:rápido].
+Voy a [1:darme] una ducha [2:rápida].
+
+Estoy terminado.
+[1:Estoy terminado].
+[1:Ya terminé].
+
+Él dijo a mí que viniera.
+Él [1:dijo a mí] que viniera.
+Él [1:me dijo] que viniera.
+
+Español es difícil pero yo no rendiré.
+[1:Español] es difícil pero yo no [1:rendiré].
+[2:El español] es difícil, pero yo no [1:me rendiré].
+
+(redundante)
+Espero que vienes mañana.
+Espero que [1:vienes] mañana.
+Espero que [1:vengas] mañana.
+
+(redundante)
+Estoy sabiendo la respuesta.
+[1:Estoy sabiendo] la respuesta.
+[1:Ya sé] la respuesta.
+
+(redundante)
+Este café es más bueno que el otro.
+Este café es [1:más bueno] que el otro.
+Este café es [1:mejor] que el otro.
+
+El examén fue díficil
+El [1:examén] fue [2:díficil]
+El [1:examen] fue [2:difícil]
