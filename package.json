@@ -64,7 +64,6 @@
 	},
 	"dependencies": {
 		"@internationalized/date": "^3.12.0",
-		"bullmq": "^5.73.0",
 		"dedent": "^1.7.2",
 		"diff": "^9.0.0",
 		"drizzle-seed": "^0.3.1",
