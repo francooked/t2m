@@ -6,7 +6,8 @@ import {
 	pgEnum,
 	timestamp,
 	index,
-	jsonb
+	jsonb,
+	primaryKey
 } from 'drizzle-orm/pg-core';
 import { isNull } from 'drizzle-orm';
 import { user } from './auth.schema';
@@ -115,4 +116,17 @@ export const exercise = pgTable(
 			.on(table.userId, table.createdAt.desc())
 			.where(isNull(table.archivedAt))
 	]
+);
+
+export const exerciseMessageRewrite = pgTable(
+	'exercise_message_rewrite',
+	{
+		exerciseId: integer('exercise_id')
+			.references(() => exercise.id, { onDelete: 'cascade' })
+			.notNull(),
+		messageRewriteId: integer('message_rewrite_id')
+			.references(() => messageRewrite.id, { onDelete: 'cascade' })
+			.notNull()
+	},
+	(table) => [primaryKey({ columns: [table.exerciseId, table.messageRewriteId] })]
 );
