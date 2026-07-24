@@ -21,8 +21,6 @@
 			submitting = false;
 		};
 	};
-
-	$inspect(data.messages);
 </script>
 
 <div class="p-2">
@@ -125,3 +123,15 @@
 	>
 	<input type="hidden" name="chat_id" value={params.id} />
 </form>
+
+<h1 class="font-bold underline">Ejercicios generados</h1>
+<ul>
+	{#each data.exercises as exercise}
+		{#if exercise.type === 'full_answer' && exercise.version === 1}
+			<li>
+				✕ {exercise.payload.front}<br />
+				✓ {exercise.payload.back}
+			</li>
+		{/if}
+	{/each}
+</ul>

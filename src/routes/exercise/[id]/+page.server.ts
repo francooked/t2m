@@ -18,6 +18,8 @@ import {
 	resolveNextNewExercises,
 	resolveNextPendingExercises
 } from '$lib/server/exercise/next-exercise';
+import { tokenize } from '$lib/correction/tokenize';
+import { diffArrays } from 'diff';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const signedInUser = requireUserSession(locals);
@@ -108,6 +110,20 @@ export const actions = {
 		if (!exercise) return redirect(302, '/exercise');
 
 		if (exercise.type === 'full_answer' && exercise.version === 1) {
+			const differences = diffArrays(
+				tokenize(formDataParse.data.answer, exercise.targetLanguage),
+				tokenize(exercise.payload.back, exercise.targetLanguage)
+			).map(({ added, removed, value }) => ({ added, removed, value: value.join('') }));
+
+			if (differences.length === 1 && !differences.at(0)?.added && !differences.at(0)?.removed) {
+				return {
+					expected: exercise.payload.back,
+					answer: formDataParse.data.answer,
+					differences,
+					tips: []
+				};
+			}
+
 			const groqClient = new Groq({ apiKey: GROQ_API_KEY });
 			const chatCompletionContent = (
 				await groqClient.chat.completions.create({
@@ -123,7 +139,7 @@ export const actions = {
 						}
 					),
 					model: 'openai/gpt-oss-20b',
-					temperature: 0.5,
+					temperature: 0.1,
 					max_completion_tokens: 4096,
 					top_p: 1,
 					stop: null
@@ -142,9 +158,10 @@ export const actions = {
 					return fail(500, { code: 'invalid_llm_response' });
 				}
 				return {
-					tips: translationFeedbackParse.data.tips,
 					expected: exercise.payload.back,
-					answer: formDataParse.data.answer
+					answer: formDataParse.data.answer,
+					tips: translationFeedbackParse.data.tips,
+					differences
 				};
 			} catch {
 				return fail(500, { code: 'invalid_llm_response' });

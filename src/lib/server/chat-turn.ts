@@ -262,6 +262,10 @@ async function correctUserMessage({
 		if (!exercise) throw new ChatTurnError('persist_failed');
 
 		await tx
+			.insert(schema.exerciseMessageRewrite)
+			.values({ exerciseId: exercise.id, messageRewriteId: lastMessageRewrite.id });
+
+		await tx
 			.update(schema.message)
 			.set({ status: 'complete' })
 			.where(and(eq(schema.message.chatId, chat.id), eq(schema.message.id, userMessage.id)));

@@ -1,3 +1,4 @@
+import type { LANGUAGE_CODES } from '$lib/constants';
 import { lcs, type LCSOperation } from './lcs';
 import { tokenize } from './tokenize';
 
@@ -49,8 +50,12 @@ function applyLCSOperationsToCells(
 	return updatedCells;
 }
 
-export function buildBlame(original: string, rewrites: Rewrite[]): Cell[] {
-	let cells: Cell[] = tokenize(original).map((text) => ({
+export function buildBlame(
+	original: string,
+	rewrites: Rewrite[],
+	languageCode: (typeof LANGUAGE_CODES)[number]
+): Cell[] {
+	let cells: Cell[] = tokenize(original, languageCode).map((text) => ({
 		text,
 		status: 'alive',
 		bornRewriteIndex: null,
@@ -59,7 +64,11 @@ export function buildBlame(original: string, rewrites: Rewrite[]): Cell[] {
 
 	rewrites.forEach((rewrite, index) => {
 		const aliveTexts = cells.filter((cell) => cell.status === 'alive').map((cell) => cell.text);
-		cells = applyLCSOperationsToCells(cells, lcs(aliveTexts, tokenize(rewrite.sentence)), index);
+		cells = applyLCSOperationsToCells(
+			cells,
+			lcs(aliveTexts, tokenize(rewrite.sentence, languageCode)),
+			index
+		);
 	});
 
 	return cells;

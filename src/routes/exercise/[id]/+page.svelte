@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { diffChars } from 'diff';
 	import type { PageProps, SubmitFunction } from './$types';
 	import { goto } from '$app/navigation';
 
@@ -9,11 +8,7 @@
 	let tips = $state<string[]>([]);
 	let expected = $state<string | null>(null);
 	let answer = $state<string | null>(null);
-	let differences = $derived(
-		expected && answer
-			? diffChars(expected, answer).map(({ added, removed, value }) => ({ added, removed, value }))
-			: []
-	);
+	let differences = $state<{ added: boolean; removed: boolean; value: string }[]>([]);
 
 	const handleCheckAnswer: SubmitFunction = async () => {
 		return async ({ result }) => {
@@ -24,6 +19,7 @@
 				phase = 'rating';
 				expected = result.data.expected;
 				answer = result.data.answer;
+				differences = result.data.differences;
 			}
 		};
 	};
