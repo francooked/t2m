@@ -1,119 +1,161 @@
-import type { PromptFn } from './utils';
-import z from 'zod';
-import type { LANGUAGE_CODES } from '$lib/constants';
+import * as z from 'zod';
+import { LANGUAGE_CODE_LABELS, LANGUAGE_CODES } from '$lib/constants';
 import dedent from 'dedent';
+import type {
+	ChatCompletionAssistantMessageParam,
+	ChatCompletionUserMessageParam,
+	ChatCompletionSystemMessageParam
+} from 'groq-sdk/resources/chat.js';
 
-export const translationFeedbackSchema = z.object({
-	tips: z.array(z.string().min(1))
+export const inputSchema = z
+	.object({
+		nativeLanguage: z.enum(LANGUAGE_CODES),
+		targetLanguage: z.enum(LANGUAGE_CODES),
+		original: z.string().min(1),
+		expected: z.string().min(1),
+		answer: z.string().min(1)
+	})
+	.refine(({ nativeLanguage, targetLanguage, expected, answer }) => {
+		return nativeLanguage !== targetLanguage && expected !== answer;
+	});
+
+export const outputSchema = z.object({
+	tips: z.array(z.string().min(1)).max(3)
 });
 
-export type LLMTranslationFeedback = z.infer<typeof translationFeedbackSchema>;
-
-export const prompts: PromptFn<
-	{ original: string; expected: string; answer: string },
-	{
-		nativeLanguage: (typeof LANGUAGE_CODES)[number];
-		targetLanguage: (typeof LANGUAGE_CODES)[number];
-	}
-> = (input, options) => {
-	return [
-		{
-			role: 'system',
-			content: dedent`
-                Actúa como tutor breve de idiomas.
-
-                Tarea:
-                - Explicar brevemente qué debe cambiar para acercarse a la respuesta esperada.
-
-                Contexto:
-                - Idioma nativo del usuario: ${options.nativeLanguage}
-                - Idioma objetivo: ${options.targetLanguage}
-
-                Entrada:
-                - original: frase o contexto original.
-                - expected: respuesta esperada exacta.
-                - answer: respuesta del usuario.
-
-                Formato de respuesta (OBLIGATORIO):
-
-                {
-                    "tips": string[]
-                }
-                
-                Reglas:
-                - Máximo 3 tips.
-                - Cada tip debe ser breve y claro.
-                - Escribe los tips en el idioma nativo del usuario: ${options.nativeLanguage}.
-                - Enfócate en los errores más importantes.
-                - Puedes incluir pequeñas frases en el idioma objetivo: ${options.targetLanguage}.
-                `
-		},
+export const buildFewShot = ({
+	input,
+	output
+}: {
+	input: z.infer<typeof inputSchema>;
+	output?: z.infer<typeof outputSchema>;
+}): (ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam)[] => {
+	const turns: (ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam)[] = [
 		{
 			role: 'user',
-			content: dedent`
-                original: "Quiero comer"
-                expected: "I want to eat"
-                answer: "I want eat"
-            `
-		},
-		{
-			role: 'assistant',
-			content: dedent`
-                {
-                    "tips": [
-                        "\"want\" needs \"to\" before another verb: \"want to eat\".",
-                        "In English, verb + verb usually requires \"to\" (e.g., \"want to go\", \"need to study\")."
-                    ]
-                }
-            `
-		},
-		{
-			role: 'user',
-			content: dedent`
-                original: "Voy al trabajo"
-                expected: "I go to work"
-                answer: "I am going to work"
-            `
-		},
-		{
-			role: 'assistant',
-			content: dedent`
-                {
-                    "tips": [
-                        "The expected answer uses present simple: \"I go to work\".",
-                        "\"I am going\" is present continuous and changes the meaning.",
-                        "Match the exact tense used in the expected translation."
-                    ]
-                }
-            `
-		},
-		{
-			role: 'user',
-			content: dedent`
-                original: "Quisiera un café"
-                expected: "Je voudrais un café"
-                answer: "Je veux un café"
-            `
-		},
-		{
-			role: 'assistant',
-			content: dedent`
-                {
-                    "tips": [
-                        "\"voudrais\" is conditional — more polite than \"veux\".",
-                        "\"Je veux\" sounds direct; use \"Je voudrais\" for requests.",
-                        "Politeness matters in French requests."
-                    ]
-                }
-            `
-		},
-		{
-			role: 'user',
-			content: dedent`
-                original: "${input.original}"
-                expected: "${input.expected}"
-                answer: "${input.answer}"
-            `
+			content: JSON.stringify({
+				nativeLanguage: LANGUAGE_CODE_LABELS.es[input.nativeLanguage],
+				targetLanguage: LANGUAGE_CODE_LABELS.es[input.targetLanguage],
+				original: input.original,
+				expected: input.expected,
+				answer: input.answer
+			})
 		}
 	];
+	if (output) turns.push({ role: 'assistant', content: JSON.stringify(output) });
+	return turns;
 };
+
+export const fewShots: ReturnType<typeof buildFewShot> = [
+	...buildFewShot({
+		input: {
+			original: 'Quiero comer',
+			expected: 'I want to eat',
+			answer: 'I want eat',
+			nativeLanguage: 'es',
+			targetLanguage: 'en'
+		},
+		output: {
+			tips: [
+				'"want" necesita "to" antes de otro verbo: "want to eat".',
+				'En inglés, verbo + verbo suele requerir "to" (p. ej. "want to go").'
+			]
+		}
+	}),
+	...buildFewShot({
+		input: {
+			original: 'Voy al trabajo',
+			expected: 'I go to work',
+			answer: 'I am going to work',
+			nativeLanguage: 'es',
+			targetLanguage: 'en'
+		},
+		output: {
+			tips: [
+				'La respuesta esperada usa presente simple: "I go to work".',
+				'"I am going" es presente continuo y cambia el significado.'
+			]
+		}
+	}),
+	...buildFewShot({
+		input: {
+			original: 'I go to the gym',
+			expected: 'Voy al gimnasio',
+			answer: 'Voy a gimnasio',
+			nativeLanguage: 'en',
+			targetLanguage: 'es'
+		},
+		output: {
+			tips: [
+				'Use "al" (a + el) before "gimnasio": "Voy al gimnasio".',
+				'"a gimnasio" is missing the article "el".'
+			]
+		}
+	}),
+	...buildFewShot({
+		input: {
+			original: 'I would like a coffee',
+			expected: 'Quisiera un café',
+			answer: 'Quiero un café',
+			nativeLanguage: 'en',
+			targetLanguage: 'es'
+		},
+		output: {
+			tips: [
+				'"Quisiera" is more polite than "Quiero" for requests.',
+				'"Quiero un café" sounds direct; use "Quisiera" to be courteous.'
+			]
+		}
+	}),
+	...buildFewShot({
+		input: {
+			original: 'She told me at the meeting',
+			expected: 'Me lo dijo en la reunión',
+			answer: 'Me lo dijo a la reunión',
+			nativeLanguage: 'en',
+			targetLanguage: 'es'
+		},
+		output: {
+			tips: ['Use "en" (not "a") for being inside an event: "en la reunión".']
+		}
+	})
+];
+
+export const buildPrompt = (
+	input: z.infer<typeof inputSchema>
+): (
+	| ChatCompletionSystemMessageParam
+	| ChatCompletionUserMessageParam
+	| ChatCompletionAssistantMessageParam
+)[] => [
+	{
+		role: 'system',
+		content: dedent`
+            Actúa como tutor breve de idiomas.
+
+            Tarea:
+            - Explicar brevemente qué debe cambiar para acercarse a la respuesta esperada.
+
+            Contexto:
+            - Idioma nativo del usuario: ${LANGUAGE_CODE_LABELS.es[input.nativeLanguage]}
+            - Idioma objetivo: ${LANGUAGE_CODE_LABELS.es[input.targetLanguage]}
+
+            Entrada:
+            - original: frase o contexto original.
+            - expected: respuesta esperada exacta.
+            - answer: respuesta del usuario.
+
+            Formato de respuesta (OBLIGATORIO):
+            { "tips": string[] }
+            
+            Reglas:
+            - Máximo 3 tips, enfocados en los errores más importantes.
+			- Texto plano, SIN markdown (nada de *, _, backticks, viñetas ni encabezados).
+            - Cada tip breve: máximo ~15 palabras.
+            - Escribe los tips en ${LANGUAGE_CODE_LABELS.es[input.nativeLanguage]}.
+			- Puedes incluir pequeñas frases en ${LANGUAGE_CODE_LABELS.es[input.targetLanguage]}.
+            `
+	},
+	...fewShots,
+	...buildFewShot({ input })
+];

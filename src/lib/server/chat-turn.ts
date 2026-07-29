@@ -5,13 +5,14 @@ import { eq, and, inArray } from 'drizzle-orm';
 import Groq from 'groq-sdk';
 import { GROQ_API_KEY } from '$env/static/private';
 import {
-	messageReplyResponseSchema,
-	prompts as replyPrompts
+	buildPrompt as buildMessageReplyPrompt,
+	outputSchema as messageReplyOutputSchema
 } from '$lib/prompts/conversation-reply';
 import {
 	buildPrompt as buildMessageCorrectionPrompt,
 	outputSchema as messageCorrectionOutputSchema
 } from '$lib/prompts/message-correction';
+import { retry } from './retry';
 
 const groqClient = new Groq({ apiKey: GROQ_API_KEY });
 
@@ -141,31 +142,41 @@ async function replyUserMessage({
 	// Another task has already claimed this message.
 	if (!claimed) return;
 
-	const chatCompletion = await groqClient.chat.completions.create({
-		messages: replyPrompts(
-			messages
-				.filter((message) => message.id <= userMessage.id)
-				.map(({ role, content }) => ({ role, content })),
-			{
-				nativeLanguage: chat.nativeLanguage,
-				targetLanguage: chat.targetLanguage
-			}
-		),
-		model: 'openai/gpt-oss-20b',
-		temperature: 0.5,
-		max_completion_tokens: 4096,
-		top_p: 1,
-		stop: null
-	});
+	const llmResponse = await retry({
+		fn: async () => {
+			const chatCompletion = await groqClient.chat.completions.create({
+				messages: buildMessageReplyPrompt({
+					nativeLanguage: chat.nativeLanguage,
+					targetLanguage: chat.targetLanguage,
+					turns: messages
+						.filter((message) => message.id <= userMessage.id)
+						.map(({ role, content }) => ({ role, content }))
+				}),
+				model: 'openai/gpt-oss-20b',
+				response_format: {
+					type: 'json_schema',
+					json_schema: {
+						name: 'message_reply',
+						strict: false,
+						schema: z.toJSONSchema(messageReplyOutputSchema)
+					}
+				},
+				temperature: 0.5,
+				max_completion_tokens: 4096,
+				top_p: 1,
+				stop: null
+			});
 
-	const reply = await parseLlmResponse(
-		chatCompletion.choices.at(0)?.message.content,
-		messageReplyResponseSchema
-	);
+			return parseLlmResponse(
+				chatCompletion.choices.at(0)?.message.content,
+				messageReplyOutputSchema
+			);
+		}
+	});
 
 	await db
 		.update(schema.message)
-		.set({ content: reply.answer, status: 'complete' })
+		.set({ content: llmResponse.answer, status: 'complete' })
 		.where(and(eq(schema.message.chatId, chat.id), eq(schema.message.id, assistantMessage.id)));
 }
 
@@ -196,25 +207,37 @@ async function correctUserMessage({
 	// Another task has already claimed this message.
 	if (!claimed) return;
 
-	const chatCompletion = await groqClient.chat.completions.create({
-		messages: buildMessageCorrectionPrompt({
-			nativeLanguage: chat.nativeLanguage,
-			targetLanguage: chat.targetLanguage,
-			turns: messages
-				.filter((message) => message.id <= userMessage.id)
-				.map(({ role, content }) => ({ role, content }))
-		}),
-		model: 'openai/gpt-oss-20b',
-		temperature: 0.2,
-		max_completion_tokens: 4096,
-		top_p: 1,
-		stop: null
-	});
+	const llmResponse = await retry({
+		fn: async () => {
+			const chatCompletion = await groqClient.chat.completions.create({
+				messages: buildMessageCorrectionPrompt({
+					nativeLanguage: chat.nativeLanguage,
+					targetLanguage: chat.targetLanguage,
+					turns: messages
+						.filter((message) => message.id <= userMessage.id)
+						.map(({ role, content }) => ({ role, content }))
+				}),
+				response_format: {
+					type: 'json_schema',
+					json_schema: {
+						name: 'message_correction',
+						schema: z.toJSONSchema(messageCorrectionOutputSchema, { io: 'input' }),
+						strict: false
+					}
+				},
+				model: 'openai/gpt-oss-20b',
+				temperature: 0.2,
+				max_completion_tokens: 4096,
+				top_p: 1,
+				stop: null
+			});
 
-	const llmResponse = await parseLlmResponse(
-		chatCompletion.choices.at(0)?.message.content,
-		messageCorrectionOutputSchema
-	);
+			return parseLlmResponse(
+				chatCompletion.choices.at(0)?.message.content,
+				messageCorrectionOutputSchema
+			);
+		}
+	});
 
 	if (llmResponse.steps.length === 0) {
 		await updateMessageStatus({

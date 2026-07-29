@@ -12,7 +12,7 @@ import {
 import z from 'zod';
 import Groq from 'groq-sdk';
 import { GROQ_API_KEY } from '$env/static/private';
-import { prompts, translationFeedbackSchema } from '$lib/prompts/translation-feedback';
+import { buildPrompt, outputSchema } from '$lib/prompts/translation-feedback';
 import { createEmptyCard, fsrs, Rating, type StepUnit } from 'ts-fsrs';
 import {
 	resolveNextNewExercises,
@@ -20,6 +20,19 @@ import {
 } from '$lib/server/exercise/next-exercise';
 import { tokenize } from '$lib/correction/tokenize';
 import { diffArrays } from 'diff';
+import { ChatTurnError } from '$lib/server/chat-turn';
+import { retry } from '$lib/server/retry';
+
+async function parseLlmResponse<T extends z.ZodType>(content: any, schema: T) {
+	try {
+		const json = JSON.parse(content);
+		const parsed = schema.parse(json);
+		return parsed;
+	} catch {
+		console.error('invalid llm response:', content);
+		throw new ChatTurnError('llm_invalid_response');
+	}
+}
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const signedInUser = requireUserSession(locals);
@@ -125,47 +138,42 @@ export const actions = {
 			}
 
 			const groqClient = new Groq({ apiKey: GROQ_API_KEY });
-			const chatCompletionContent = (
-				await groqClient.chat.completions.create({
-					messages: prompts(
-						{
+
+			const llmResponse = await retry({
+				fn: async () => {
+					const chatCompletion = await groqClient.chat.completions.create({
+						messages: buildPrompt({
 							original: exercise.payload.extra,
 							expected: exercise.payload.back,
-							answer: formDataParse.data.answer
-						},
-						{
+							answer: formDataParse.data.answer,
 							nativeLanguage: exercise.nativeLanguage,
 							targetLanguage: exercise.targetLanguage
-						}
-					),
-					model: 'openai/gpt-oss-20b',
-					temperature: 0.1,
-					max_completion_tokens: 4096,
-					top_p: 1,
-					stop: null
-				})
-			).choices.at(0)?.message.content;
+						}),
+						model: 'openai/gpt-oss-20b',
+						response_format: {
+							type: 'json_schema',
+							json_schema: {
+								name: 'translation_feedback',
+								strict: false,
+								schema: z.toJSONSchema(outputSchema)
+							}
+						},
+						temperature: 0.1,
+						max_completion_tokens: 4096,
+						top_p: 1,
+						stop: null
+					});
 
-			if (!chatCompletionContent) {
-				return fail(500, { code: 'invalid_llm_response' });
-			}
-
-			try {
-				const translationFeedbackParse = translationFeedbackSchema.safeParse(
-					await JSON.parse(chatCompletionContent)
-				);
-				if (!translationFeedbackParse.success) {
-					return fail(500, { code: 'invalid_llm_response' });
+					return parseLlmResponse(chatCompletion.choices.at(0)?.message.content, outputSchema);
 				}
-				return {
-					expected: exercise.payload.back,
-					answer: formDataParse.data.answer,
-					tips: translationFeedbackParse.data.tips,
-					differences
-				};
-			} catch {
-				return fail(500, { code: 'invalid_llm_response' });
-			}
+			});
+
+			return {
+				expected: exercise.payload.back,
+				answer: formDataParse.data.answer,
+				tips: llmResponse.tips,
+				differences
+			};
 		} else {
 			return fail(400, { code: 'invalid_exercise_type_or_version' });
 		}

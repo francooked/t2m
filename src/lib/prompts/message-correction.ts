@@ -1,18 +1,25 @@
 import type {
 	ChatCompletionAssistantMessageParam,
-	ChatCompletionUserMessageParam
+	ChatCompletionUserMessageParam,
+	ChatCompletionSystemMessageParam
 } from 'groq-sdk/resources/chat.js';
 import { LANGUAGE_CODE_LABELS, LANGUAGE_CODES } from '$lib/constants';
 import dedent from 'dedent';
 import * as z from 'zod';
-import type { ChatCompletionSystemMessageParam } from 'groq-sdk/resources/chat.mjs';
 import { normalizeText } from '$lib/correction/normalize-text';
 
-export const inputSchema = z.object({
-	nativeLanguage: z.enum(LANGUAGE_CODES),
-	targetLanguage: z.enum(LANGUAGE_CODES),
-	turns: z.array(z.object({ role: z.enum(['assistant', 'user']), content: z.string() }))
-});
+export const inputSchema = z
+	.object({
+		nativeLanguage: z.enum(LANGUAGE_CODES),
+		targetLanguage: z.enum(LANGUAGE_CODES),
+		turns: z.array(z.object({ role: z.enum(['assistant', 'user']), content: z.string() }))
+	})
+	.refine(({ nativeLanguage, targetLanguage, turns }) => {
+		return (
+			nativeLanguage !== targetLanguage &&
+			turns.every(({ role }, index) => (index % 2 === 0 ? role === 'user' : role === 'assistant'))
+		);
+	});
 
 export const outputSchema = z.object({
 	steps: z.array(
@@ -337,11 +344,10 @@ export const buildPrompt = (
 	| ChatCompletionSystemMessageParam
 	| ChatCompletionUserMessageParam
 	| ChatCompletionAssistantMessageParam
-)[] => {
-	return [
-		{
-			role: 'system',
-			content: dedent`
+)[] => [
+	{
+		role: 'system',
+		content: dedent`
 				Recibirás un historial de mensajes en un idioma objetivo "targetLanguage", escritos por alguien cuyo idioma nativo es "nativeLanguage".
 				Tu tarea es corregir solo el último mensaje del historial, con el mínimo de cambios para que suene natural en el idioma objetivo "targetLanguage".
 
@@ -363,10 +369,9 @@ export const buildPrompt = (
 					"translation": "..."
 				}
 			`
-		},
-		...fewShots,
-		...buildFewShot({
-			input
-		})
-	];
-};
+	},
+	...fewShots,
+	...buildFewShot({
+		input
+	})
+];
