@@ -158,7 +158,7 @@ export const actions = {
 								schema: z.toJSONSchema(outputSchema)
 							}
 						},
-						temperature: 0.1,
+						temperature: 0,
 						max_completion_tokens: 4096,
 						top_p: 1,
 						stop: null

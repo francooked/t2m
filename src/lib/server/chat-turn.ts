@@ -226,7 +226,8 @@ async function correctUserMessage({
 					}
 				},
 				model: 'openai/gpt-oss-20b',
-				temperature: 0.2,
+				// Correcting is a deterministic task: sampling only adds inconsistent groupings.
+				temperature: 0,
 				max_completion_tokens: 4096,
 				top_p: 1,
 				stop: null

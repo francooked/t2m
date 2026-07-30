@@ -1,11 +1,12 @@
 import * as z from 'zod';
-import { LANGUAGE_CODE_LABELS, LANGUAGE_CODES } from '$lib/constants';
+import { LANGUAGE_CODES } from '$lib/constants';
 import dedent from 'dedent';
 import type {
 	ChatCompletionAssistantMessageParam,
 	ChatCompletionUserMessageParam,
 	ChatCompletionSystemMessageParam
 } from 'groq-sdk/resources/chat.js';
+import { buildLanguageRules, languageName, selectExamples, type LanguagePair } from './utils';
 
 export const inputSchema = z
 	.object({
@@ -23,6 +24,11 @@ export const outputSchema = z.object({
 	tips: z.array(z.string().min(1)).max(3)
 });
 
+export type Input = z.infer<typeof inputSchema>;
+export type Output = z.infer<typeof outputSchema>;
+
+type Example = { input: Input; output: Output };
+
 export const buildFewShot = ({
 	input,
 	output
@@ -34,8 +40,9 @@ export const buildFewShot = ({
 		{
 			role: 'user',
 			content: JSON.stringify({
-				nativeLanguage: LANGUAGE_CODE_LABELS.es[input.nativeLanguage],
-				targetLanguage: LANGUAGE_CODE_LABELS.es[input.targetLanguage],
+				nativeLanguage: languageName(input.nativeLanguage),
+				targetLanguage: languageName(input.targetLanguage),
+				writeTipsIn: languageName(input.nativeLanguage),
 				original: input.original,
 				expected: input.expected,
 				answer: input.answer
@@ -46,80 +53,114 @@ export const buildFewShot = ({
 	return turns;
 };
 
-export const fewShots: ReturnType<typeof buildFewShot> = [
-	...buildFewShot({
+export const examples: Example[] = [
+	// nativeLanguage: es, targetLanguage: en
+	{
 		input: {
+			nativeLanguage: 'es',
+			targetLanguage: 'en',
 			original: 'Quiero comer',
 			expected: 'I want to eat',
-			answer: 'I want eat',
+			answer: 'I want eat'
+		},
+		output: {
+			tips: ['Falta "to": después de "want" el otro verbo va con "to want to eat".']
+		}
+	},
+	{
+		input: {
 			nativeLanguage: 'es',
-			targetLanguage: 'en'
+			targetLanguage: 'en',
+			original: 'Voy al trabajo todos los días',
+			expected: 'I go to work every day',
+			answer: 'I am going to work every day'
 		},
 		output: {
 			tips: [
-				'"want" necesita "to" antes de otro verbo: "want to eat".',
-				'En inglés, verbo + verbo suele requerir "to" (p. ej. "want to go").'
+				'Para una rutina se usa presente simple: "I go to work".',
+				'"I am going" es presente continuo y suena a algo puntual.'
 			]
 		}
-	}),
-	...buildFewShot({
+	},
+	{
 		input: {
-			original: 'Voy al trabajo',
-			expected: 'I go to work',
-			answer: 'I am going to work',
 			nativeLanguage: 'es',
-			targetLanguage: 'en'
+			targetLanguage: 'en',
+			original: 'Ayer fui a la tienda',
+			expected: 'Yesterday I went to the store',
+			answer: 'I went to the store yesterday'
 		},
 		output: {
-			tips: [
-				'La respuesta esperada usa presente simple: "I go to work".',
-				'"I am going" es presente continuo y cambia el significado.'
-			]
+			tips: ['Tu respuesta también es correcta; "yesterday" puede ir al final o al inicio.']
 		}
-	}),
-	...buildFewShot({
+	},
+	// nativeLanguage: en, targetLanguage: es
+	{
 		input: {
+			nativeLanguage: 'en',
+			targetLanguage: 'es',
 			original: 'I go to the gym',
 			expected: 'Voy al gimnasio',
-			answer: 'Voy a gimnasio',
-			nativeLanguage: 'en',
-			targetLanguage: 'es'
+			answer: 'Voy a gimnasio'
 		},
 		output: {
-			tips: [
-				'Use "al" (a + el) before "gimnasio": "Voy al gimnasio".',
-				'"a gimnasio" is missing the article "el".'
-			]
+			tips: ['"gimnasio" needs the article: "a" + "el" becomes "al gimnasio".']
 		}
-	}),
-	...buildFewShot({
+	},
+	{
 		input: {
-			original: 'I would like a coffee',
-			expected: 'Quisiera un café',
-			answer: 'Quiero un café',
 			nativeLanguage: 'en',
-			targetLanguage: 'es'
-		},
-		output: {
-			tips: [
-				'"Quisiera" is more polite than "Quiero" for requests.',
-				'"Quiero un café" sounds direct; use "Quisiera" to be courteous.'
-			]
-		}
-	}),
-	...buildFewShot({
-		input: {
+			targetLanguage: 'es',
 			original: 'She told me at the meeting',
 			expected: 'Me lo dijo en la reunión',
-			answer: 'Me lo dijo a la reunión',
-			nativeLanguage: 'en',
-			targetLanguage: 'es'
+			answer: 'Me lo dijo a la reunión'
 		},
 		output: {
-			tips: ['Use "en" (not "a") for being inside an event: "en la reunión".']
+			tips: ['Use "en" for being inside an event: "en la reunión", not "a la reunión".']
 		}
-	})
+	},
+	{
+		input: {
+			nativeLanguage: 'en',
+			targetLanguage: 'es',
+			original: 'My sister is very tall',
+			expected: 'Mi hermana es muy alta',
+			answer: 'Mi hermana es muy alto'
+		},
+		output: {
+			tips: ['"hermana" is feminine, so the adjective becomes "alta".']
+		}
+	}
 ];
+
+const buildSystemPrompt = ({ nativeLanguage, targetLanguage }: LanguagePair): string => {
+	const target = languageName(targetLanguage);
+	const native = languageName(nativeLanguage);
+
+	return dedent`
+		Eres un tutor de idiomas. El usuario tradujo una frase a ${target} y tú explicas la diferencia con la respuesta esperada.
+
+		${buildLanguageRules({ nativeLanguage, targetLanguage })}
+
+		Entrada:
+		- original: la frase en ${native} que el usuario tenía que expresar.
+		- expected: la respuesta esperada en ${target}.
+		- answer: lo que escribió el usuario.
+
+		Reglas:
+		- Máximo 3 tips, uno por diferencia; parte por la más importante.
+		- Cada tip: una frase en ${native}, máximo 15 palabras, y puedes citar palabras en ${target} entre comillas.
+		- Compara solo answer con expected; no corrijas cosas que el usuario escribió bien.
+		- Si la diferencia es solo de tildes, mayúsculas o puntuación, dilo en un único tip.
+		- Si answer también es correcta y natural aunque no sea idéntica a expected, dilo en un solo tip.
+		- Texto plano: sin markdown, sin viñetas, sin numeración.
+
+		Responde SOLO con este JSON:
+		{"tips":["..."]}
+
+		Antes de responder, revisa: cada tip está completo en ${native}, sin una sola palabra de ${target} fuera de comillas. Si no, reescríbelo.
+	`;
+};
 
 export const buildPrompt = (
 	input: z.infer<typeof inputSchema>
@@ -128,34 +169,7 @@ export const buildPrompt = (
 	| ChatCompletionUserMessageParam
 	| ChatCompletionAssistantMessageParam
 )[] => [
-	{
-		role: 'system',
-		content: dedent`
-            Actúa como tutor breve de idiomas.
-
-            Tarea:
-            - Explicar brevemente qué debe cambiar para acercarse a la respuesta esperada.
-
-            Contexto:
-            - Idioma nativo del usuario: ${LANGUAGE_CODE_LABELS.es[input.nativeLanguage]}
-            - Idioma objetivo: ${LANGUAGE_CODE_LABELS.es[input.targetLanguage]}
-
-            Entrada:
-            - original: frase o contexto original.
-            - expected: respuesta esperada exacta.
-            - answer: respuesta del usuario.
-
-            Formato de respuesta (OBLIGATORIO):
-            { "tips": string[] }
-            
-            Reglas:
-            - Máximo 3 tips, enfocados en los errores más importantes.
-			- Texto plano, SIN markdown (nada de *, _, backticks, viñetas ni encabezados).
-            - Cada tip breve: máximo ~15 palabras.
-            - Escribe los tips en ${LANGUAGE_CODE_LABELS.es[input.nativeLanguage]}.
-			- Puedes incluir pequeñas frases en ${LANGUAGE_CODE_LABELS.es[input.targetLanguage]}.
-            `
-	},
-	...fewShots,
+	{ role: 'system', content: buildSystemPrompt(input) },
+	...selectExamples(examples, input).flatMap((example) => buildFewShot(example)),
 	...buildFewShot({ input })
 ];
