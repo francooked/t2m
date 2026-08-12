@@ -1,44 +1,44 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
 	import { LANGUAGE_CODES, LANGUAGE_CODE_LABELS } from '$lib/constants';
-	import type { PageProps, SubmitFunction } from './$types';
+	import { createFormView } from '$lib/forms/create-form-view.svelte';
+	import { SIGN_IN_ID } from '$lib/forms/sign-in';
+	import { SIGN_UP_ID } from '$lib/forms/sign-up';
+	import type { PageProps } from './$types';
 
-	let {}: PageProps = $props();
+	let { form }: PageProps = $props();
+	let signIn = createFormView({ id: SIGN_IN_ID });
+	let signUp = createFormView({ id: SIGN_UP_ID });
 
 	const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-	const handleSignInEmail: SubmitFunction = () => {
-		return async ({ result, update }) => {
-			if (result.type === 'redirect') {
-				goto(result.location);
-			} else if (result.type === 'failure') {
-				console.log('failure:', result);
-			}
-		};
-	};
+	signIn.sync(() => form);
+	signUp.sync(() => form);
 
-	const handleSignUpEmail: SubmitFunction = () => {
-		return async ({ result }) => {
-			if (result.type === 'redirect') {
-				goto(result.location);
-			} else if (result.type === 'failure') {
-				console.log('failure:', result);
-			}
-		};
-	};
+	$effect(() => {
+		signIn.sync(() => form);
+		signUp.sync(() => form);
+	});
 </script>
 
-<form class="p-2" method="post" action="?/signInEmail" use:enhance={handleSignInEmail}>
+<form class="p-2" method="post" action="?/signInEmail" use:enhance={signIn.enhance}>
+	{#if signIn.view.status === 'failure'}
+		<p>Error al iniciar sesión</p>
+	{/if}
 	<h1 class="font-bold underline">Iniciar sesión</h1>
 	<label for="signin_username">Correo</label>
 	<input id="signin_username" name="email" type="email" />
 	<label for="signin_password">Contraseña</label>
 	<input id="signin_password" name="password" type="password" />
-	<button type="submit">Iniciar sesión</button>
+	<button type="submit" disabled={signIn.view.status === 'pending'}
+		>{signIn.view.status === 'pending' ? 'Cargando' : 'Iniciar sesión'}</button
+	>
 </form>
 
-<form class="p-2" method="post" action="?/signUpEmail" use:enhance={handleSignUpEmail}>
+<form class="p-2" method="post" action="?/signUpEmail" use:enhance={signUp.enhance}>
+	{#if signUp.view.status === 'failure'}
+		<p>Error al registrar</p>
+	{/if}
 	<h1 class="font-bold underline">Registrarse</h1>
 	<label for="signup_email">Correo</label>
 	<input id="signup_email" name="email" type="email" />
@@ -53,5 +53,7 @@
 		{/each}
 	</select>
 	<input type="hidden" name="time_zone" value={timeZone} />
-	<button type="submit">Registrarse</button>
+	<button type="submit" disabled={signUp.view.status === 'pending'}
+		>{signUp.view.status === 'pending' ? 'Cargando' : 'Registrarse'}</button
+	>
 </form>

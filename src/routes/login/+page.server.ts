@@ -7,6 +7,10 @@ import { LANGUAGE_CODES, TIME_ZONES } from '$lib/constants';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/db/schema';
 import { generatorParameters } from 'ts-fsrs';
+import { formFail } from '$lib/forms/result.server';
+import { SIGN_IN_ID } from '$lib/forms/sign-in';
+import { SIGN_UP_ID } from '$lib/forms/sign-up';
+import { SIGN_OUT_ID } from '$lib/forms/sign-out';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (locals.user) return redirect(302, '/chat');
@@ -30,7 +34,9 @@ export const actions = {
 			timeZone: formData.get('time_zone')?.toString() ?? ''
 		});
 
-		if (formDataParse.error) return fail(400, { code: 'invalid_form' });
+		if (formDataParse.error) {
+			return formFail({ id: SIGN_UP_ID, code: 'invalid_form_data', status: 400 });
+		}
 
 		try {
 			const { user } = await auth.api.signUpEmail({ body: { ...formDataParse.data } });
@@ -47,9 +53,9 @@ export const actions = {
 			});
 		} catch (error) {
 			if (error instanceof APIError) {
-				return fail(400, { code: 'signup_failed', message: error.message || 'Signup failed' });
+				return formFail({ id: SIGN_UP_ID, code: 'signup_failed', status: 400 });
 			}
-			return fail(500, { code: 'unexpected' });
+			return formFail({ id: SIGN_UP_ID, code: 'unexpected', status: 500 });
 		}
 
 		return redirect(303, '/chat');
@@ -65,15 +71,17 @@ export const actions = {
 			password: formData.get('password')?.toString() ?? ''
 		});
 
-		if (formDataParse.error) return fail(400, { code: 'invalid_form' });
+		if (formDataParse.error) {
+			return formFail({ id: SIGN_IN_ID, code: 'invalid_form_data', status: 400 });
+		}
 
 		try {
 			await auth.api.signInEmail({ body: { ...formDataParse.data } });
 		} catch (error) {
 			if (error instanceof APIError) {
-				return fail(400, { code: 'signin_failed', message: error.message || 'Signin failed' });
+				return formFail({ id: SIGN_IN_ID, code: 'signin_failed', status: 400 });
 			}
-			return fail(500, { code: 'unexpected' });
+			return formFail({ id: SIGN_IN_ID, code: 'unexpected', status: 500 });
 		}
 
 		return redirect(303, '/chat');
@@ -83,9 +91,9 @@ export const actions = {
 			await auth.api.signOut({ headers });
 		} catch (error) {
 			if (error instanceof APIError) {
-				return fail(400, { code: 'signout_failed' });
+				return formFail({ id: SIGN_OUT_ID, code: 'signout_failed', status: 400 });
 			}
-			return fail(500, { code: 'unexpected' });
+			return formFail({ id: SIGN_OUT_ID, code: 'unexpected', status: 500 });
 		}
 
 		return redirect(303, '/chat');
