@@ -2,13 +2,13 @@
 	import { enhance } from '$app/forms';
 	import { LANGUAGE_CODES, LANGUAGE_CODE_LABELS } from '$lib/constants';
 	import { createFormView } from '$lib/forms/create-form-view.svelte';
-	import { SIGN_IN_ID } from '$lib/forms/sign-in';
-	import { SIGN_UP_ID } from '$lib/forms/sign-up';
+	import { SIGN_IN_ID, signInFailure, signInSuccess } from '$lib/forms/sign-in';
+	import { SIGN_UP_ID, signUpFailure, signUpSuccess } from '$lib/forms/sign-up';
 	import type { PageProps } from './$types';
 
 	let { form }: PageProps = $props();
-	let signIn = createFormView({ id: SIGN_IN_ID });
-	let signUp = createFormView({ id: SIGN_UP_ID });
+	let signIn = createFormView({ id: SIGN_IN_ID, success: signInSuccess, failure: signInFailure });
+	let signUp = createFormView({ id: SIGN_UP_ID, success: signUpSuccess, failure: signUpFailure });
 
 	const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 

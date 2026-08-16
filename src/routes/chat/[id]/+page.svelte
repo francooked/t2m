@@ -1,26 +1,49 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
 	import { enhance } from '$app/forms';
-	import type { SubmitFunction } from './$types';
 	import { Popover } from 'melt/builders';
 	import { mergeAttrs } from 'melt';
+	import { createFormView } from '$lib/forms/create-form-view.svelte';
+	import {
+		REPLY_AND_CORRECT_ID,
+		replyAndCorrectFailure,
+		replyAndCorrectSuccess
+	} from '$lib/forms/reply-and-correct';
+	import { RETRY_REPLY_ID, retryReplyFailure, retryReplySuccess } from '$lib/forms/retry-reply';
+	import {
+		RETRY_CORRECTION_ID,
+		retryCorrectionFailure,
+		retryCorrectionSuccess
+	} from '$lib/forms/retry-correction';
 
-	const { data, params }: PageProps = $props();
+	const { data, params, form }: PageProps = $props();
 	const popover = new Popover();
-	let submitting = $state(false);
 	let triggerData = $state<{ reason: string } | null>();
+	let replyAndCorrect = createFormView({
+		id: REPLY_AND_CORRECT_ID,
+		success: replyAndCorrectSuccess,
+		failure: replyAndCorrectFailure
+	});
+	let retryReply = createFormView({
+		id: RETRY_REPLY_ID,
+		success: retryReplySuccess,
+		failure: retryReplyFailure
+	});
+	let retryCorrection = createFormView({
+		id: RETRY_CORRECTION_ID,
+		success: retryCorrectionSuccess,
+		failure: retryCorrectionFailure
+	});
 
-	const handleReplyAndCorrect: SubmitFunction = async () => {
-		submitting = true;
-		return async ({ result, update }) => {
-			if (result.type === 'failure' || result.type === 'error') {
-				console.error('retry reply failed:', result);
-			} else {
-				await update();
-			}
-			submitting = false;
-		};
-	};
+	replyAndCorrect.sync(() => form);
+	retryReply.sync(() => form);
+	retryCorrection.sync(() => form);
+
+	$effect(() => {
+		replyAndCorrect.sync(() => form);
+		retryReply.sync(() => form);
+		retryCorrection.sync(() => form);
+	});
 </script>
 
 <div class="p-2">
@@ -38,8 +61,16 @@
 				</span>
 
 				{#if message.status === 'failed'}
-					<form method="post" action="?/retryReply">
-						<button type="submit" class="font-medium">Reintentar</button>
+					<form method="post" action="?/retryReply" use:enhance={retryReply.enhance}>
+						{#if retryReply.view.status === 'failure'}
+							<p>Error al reintentar</p>
+						{/if}
+						<button
+							type="submit"
+							class="font-medium"
+							disabled={retryReply.view.status === 'pending'}
+							>{retryReply.view.status === 'pending' ? 'Cargando' : 'Reintentar'}</button
+						>
 						<input type="hidden" name="chat_id" value={params.id} />
 						<input type="hidden" name="message_id" value={message.id} />
 					</form>
@@ -99,8 +130,16 @@
 				{/if}
 
 				{#if message.status === 'failed'}
-					<form method="post" action="?/retryCorrection">
-						<button type="submit" class="font-medium">Reintentar</button>
+					<form method="post" action="?/retryCorrection" use:enhance={retryCorrection.enhance}>
+						{#if retryCorrection.view.status === 'failure'}
+							<p>Error al reintentar</p>
+						{/if}
+						<button
+							type="submit"
+							class="font-medium"
+							disabled={retryCorrection.view.status === 'pending'}
+							>{retryCorrection.view.status === 'pending' ? 'Cargando' : 'Reintentar'}</button
+						>
 						<input type="hidden" name="chat_id" value={params.id} />
 						<input type="hidden" name="message_id" value={message.id} />
 					</form>
@@ -116,10 +155,13 @@
 	{/if}
 </div>
 
-<form method="post" action="?/replyAndCorrect" class="p-2" use:enhance={handleReplyAndCorrect}>
+<form method="post" action="?/replyAndCorrect" class="p-2" use:enhance={replyAndCorrect.enhance}>
+	{#if replyAndCorrect.view.status === 'failure'}
+		<p>Error al enviar</p>
+	{/if}
 	<textarea placeholder="¿Cuál es tu respuesta?" name="content"></textarea>
-	<button type="submit" class="font-medium" disabled={submitting}
-		>{submitting ? 'Enviando' : 'Enviar'}</button
+	<button type="submit" class="font-medium" disabled={replyAndCorrect.view.status === 'pending'}
+		>{replyAndCorrect.view.status === 'pending' ? 'Cargando' : 'Enviar'}</button
 	>
 	<input type="hidden" name="chat_id" value={params.id} />
 </form>

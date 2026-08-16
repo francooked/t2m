@@ -1,24 +1,24 @@
+import * as z from 'zod';
 import { fail } from '@sveltejs/kit';
+import type { InferFormResult } from './contract';
 
-/** Returns a typed action failure that satisfies FormResultContract. */
-export function formFail<Id extends string, Code extends string>({
-	id,
-	code,
-	status = 400
-}: {
-	id: Id;
-	code: Code;
-	status: number;
-}) {
-	return fail(status, { id, kind: 'failure' as const, code });
-}
+export function createFormResponders<
+	const Id extends string,
+	Success extends z.ZodType,
+	Failure extends z.ZodType<{ code: string }>
+>({ id, success, failure }: { id: Id; success: Success; failure: Failure }) {
+	type Result = InferFormResult<Id, Success, Failure>;
 
-/** Returns a typed action success that satisfies FormResultContract. */
-export function formOk<
-	Id extends string,
-	Data extends Record<string, unknown> | undefined = undefined
->({ id, data }: { id: Id; data?: Data }) {
-	return data === undefined
-		? ({ id, kind: 'success' as const } as const)
-		: ({ id, kind: 'success' as const, data } as const);
+	const ok = ({ data }: { data: z.input<Success> }): Extract<Result, { kind: 'success' }> => {
+		return { id, kind: 'success', data: success.parse(data) };
+	};
+
+	const failWith = ({ error, status }: { error: z.input<Failure>; status: number }) => {
+		return fail(status, { id, kind: 'failure', error: failure.parse(error) } satisfies Extract<
+			Result,
+			{ kind: 'failure' }
+		>);
+	};
+
+	return { ok, fail: failWith };
 }

@@ -1,51 +1,37 @@
+import * as z from 'zod';
 import type { SubmitFunction } from '@sveltejs/kit';
-import type { FormResultContract } from './contract';
+import { buildContract, type InferFormResult } from './contract';
 
-export type ViewState<R extends FormResultContract> =
-	| { status: 'idle'; id: R['id'] }
-	| { status: 'pending'; id: R['id'] }
-	| ({ status: 'success' } & Omit<Extract<R, { kind: 'success' }>, 'kind'>)
-	| ({ status: 'failure' } & Omit<Extract<R, { kind: 'failure' }>, 'kind'>);
+export function createFormView<
+	Id extends string,
+	Success extends z.ZodType,
+	Failure extends z.ZodType<{ code: string }>
+>({ id, success, failure }: { id: Id; success: Success; failure: Failure }) {
+	const schema = buildContract({ id, success, failure });
 
-export function isContractSatisfied(
-	data: Record<string, unknown> | undefined
-): data is FormResultContract {
-	if (typeof data !== 'object') return false;
+	let view = $state<
+		| { status: 'idle'; id: Id }
+		| { status: 'pending'; id: Id }
+		| { status: 'success'; id: Id; data: z.output<Success> }
+		| { status: 'failure'; id: Id; error: z.output<Failure> | { code: 'unexpected' } }
+	>({ id, status: 'idle' });
 
-	const id = data.id;
-	const kind = data.kind;
+	const parseResult = (raw: unknown) => {
+		const parsed = schema.safeParse(raw);
 
-	if (
-		typeof id !== 'string' ||
-		typeof kind !== 'string' ||
-		(kind !== 'success' && kind !== 'failure')
-	)
-		return false;
+		if (!parsed.success) {
+			throw new Error('Form result did not satisfy the contract');
+		}
 
-	if (kind === 'success' && data.data !== undefined && typeof data.data !== 'object') return false;
-
-	if (kind === 'failure' && typeof data.code !== 'string') return false;
-
-	return true;
-}
-
-function formToView<R extends FormResultContract>(form: R): ViewState<R> {
-	if (form.kind === 'success') {
-		return { status: form.kind, id: form.id, data: form.data };
-	}
-	return { status: form.kind, id: form.id, code: form.code };
-}
-
-export function createFormView<R extends FormResultContract>({ id }: { id: R['id'] }) {
-	let view = $state<ViewState<R>>({ id, status: 'idle' });
+		return parsed.data as unknown as InferFormResult<Id, Success, Failure>;
+	};
 
 	const enhance: SubmitFunction = () => {
 		view = { id, status: 'pending' };
 
 		return async ({ result, update }) => {
 			if (result.type === 'error') {
-				// TODO: Log to Sentry.
-				view = { id, status: 'failure', code: 'unexpected' };
+				view = { id, status: 'failure', error: { code: 'unexpected' } };
 				return;
 			}
 
@@ -55,31 +41,36 @@ export function createFormView<R extends FormResultContract>({ id }: { id: R['id
 				return;
 			}
 
-			if (
-				!isContractSatisfied(result.data) ||
-				result.type !== result.data.kind ||
-				result.data.id !== id
-			) {
-				// TODO: Log to Sentry.
-				view = { id, status: 'idle' };
-				throw new Error(`[createFormView] Form result did not satisfy the contract`);
+			const payload = parseResult(result.data);
+
+			if (payload.kind === 'success') {
+				view = { status: 'success', id, data: payload.data };
+			} else {
+				view = { status: 'failure', id, error: payload.error };
 			}
 
-			await update({ reset: false });
+			await update({ reset: result.type === 'success' });
 		};
 	};
 
-	const sync = (getForm: () => R | null) => {
-		const form = getForm();
+	const sync = (getForm: () => unknown) => {
+		if (view.status === 'pending') return;
 
-		if (!form || form.id !== id) {
-			if (view.status !== 'idle' && view.status !== 'pending') {
-				view = { id, status: 'idle' };
-			}
+		const form = getForm();
+		if (form === null) return;
+
+		if (typeof form !== 'object' || !('id' in form) || form.id !== id) {
+			if (view.status !== 'idle') view = { id, status: 'idle' };
 			return;
 		}
 
-		view = formToView(form);
+		const payload = parseResult(form);
+
+		if (payload.kind === 'success') {
+			view = { status: 'success', id, data: payload.data };
+		} else {
+			view = { status: 'failure', id, error: payload.error };
+		}
 	};
 
 	return {

@@ -2,13 +2,28 @@ import { db } from '$lib/server/db';
 import type { PageServerLoad } from './$types';
 import * as schema from '$lib/server/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { fail, redirect } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import z from 'zod';
 import { LANGUAGE_CODES } from '$lib/constants';
 import { requireUserSession } from '$lib/server/session-user';
-import { processChatTurn } from '$lib/server/chat-turn';
+import { ChatTurnError, processChatTurn } from '$lib/server/chat-turn';
 import { normalizeText } from '$lib/correction/normalize-text';
+import { createFormResponders } from '$lib/forms/result.server';
+import { START_CHAT_ID, startChatFailure, startChatSuccess } from '$lib/forms/start-chat';
+import { DELETE_CHAT_ID, deleteChatFailure, deleteChatSuccess } from '$lib/forms/delete-chat';
+
+const startChatResponders = createFormResponders({
+	id: START_CHAT_ID,
+	success: startChatSuccess,
+	failure: startChatFailure
+});
+
+const deleteChatResponders = createFormResponders({
+	id: DELETE_CHAT_ID,
+	success: deleteChatSuccess,
+	failure: deleteChatFailure
+});
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const signedInUser = requireUserSession(locals);
@@ -63,7 +78,8 @@ export const actions = {
 			targetLanguage: formData.get('target_language')?.toString() ?? ''
 		});
 
-		if (!success) return fail(400, { code: 'invalid_input' });
+		if (!success)
+			return startChatResponders.fail({ error: { code: 'invalid_input' }, status: 400 });
 
 		const { newChat, newUserMessage, newAssistantMessage } = await db.transaction(async (tx) => {
 			const newChat = (
@@ -99,12 +115,19 @@ export const actions = {
 			return { newChat, newUserMessage, newAssistantMessage };
 		});
 
-		await processChatTurn({
-			userId: signedInUser.id,
-			chatId: newChat.id,
-			userMessageId: newUserMessage.id,
-			assistantMessageId: newAssistantMessage.id
-		});
+		try {
+			await processChatTurn({
+				userId: signedInUser.id,
+				chatId: newChat.id,
+				userMessageId: newUserMessage.id,
+				assistantMessageId: newAssistantMessage.id
+			});
+		} catch (error) {
+			if (error instanceof ChatTurnError) {
+				return startChatResponders.fail({ error: { code: 'chat_turn_error' }, status: 400 });
+			}
+			return startChatResponders.fail({ error: { code: 'unexpected' }, status: 500 });
+		}
 
 		return redirect(303, `/chat/${newChat.id}`);
 	},
@@ -117,10 +140,14 @@ export const actions = {
 		const { success, data } = zodSchema.safeParse({
 			chatId: parseInt(formData.get('chat_id')?.toString() ?? '-1')
 		});
-		if (!success) return fail(400, { code: 'invalid_input' });
+
+		if (!success)
+			return deleteChatResponders.fail({ error: { code: 'invalid_input' }, status: 400 });
 
 		await db
 			.delete(schema.chat)
 			.where(and(eq(schema.chat.id, data.chatId), eq(schema.chat.userId, signedInUser.id)));
+
+		return deleteChatResponders.ok({ data: null });
 	}
 } satisfies Actions;

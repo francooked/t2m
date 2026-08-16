@@ -1,39 +1,46 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
 	import { LANGUAGE_CODE_LABELS, LANGUAGE_CODES } from '$lib/constants';
-	import type { PageProps, SubmitFunction } from './$types';
+	import { createFormView } from '$lib/forms/create-form-view.svelte';
+	import { DELETE_CHAT_ID, deleteChatFailure, deleteChatSuccess } from '$lib/forms/delete-chat';
+	import { START_CHAT_ID, startChatFailure, startChatSuccess } from '$lib/forms/start-chat';
+	import type { PageProps } from './$types';
 
-	let { data }: PageProps = $props();
+	let { data, form }: PageProps = $props();
 
-	const handleStartChat: SubmitFunction = async () => {
-		return async ({ result }) => {
-			if (result.type === 'redirect') {
-				goto(result.location);
-			} else if (result.type === 'failure') {
-				console.log('failure:', result);
-			}
-		};
-	};
+	let startChat = createFormView({
+		id: START_CHAT_ID,
+		success: startChatSuccess,
+		failure: startChatFailure
+	});
 
-	const handleDeleteChat: SubmitFunction = async () => {
-		return async ({ result, update }) => {
-			if (result.type === 'success') {
-				await update();
-			} else if (result.type === 'error') {
-				console.log('error:', result);
-			}
-		};
-	};
+	let deleteChat = createFormView({
+		id: DELETE_CHAT_ID,
+		success: deleteChatSuccess,
+		failure: deleteChatFailure
+	});
+
+	startChat.sync(() => form);
+	deleteChat.sync(() => form);
+
+	$effect(() => {
+		startChat.sync(() => form);
+		deleteChat.sync(() => form);
+	});
 </script>
 
 <div class="p-2">
 	<h1 class="font-bold underline">Chats</h1>
-	{#each data.chats as chat}
+	{#if deleteChat.view.status === 'failure'}
+		<p>Error al eliminar</p>
+	{/if}
+	{#each data.chats as chat (chat.id)}
 		<div>
 			<a href={`/chat/${chat.id}`} class="font-medium">{chat.title}</a>
-			<form method="post" action="?/deleteChat" class="inline" use:enhance={handleDeleteChat}>
-				<button type="submit" class="font-medium">Eliminar</button>
+			<form method="post" action="?/deleteChat" class="inline" use:enhance={deleteChat.enhance}>
+				<button type="submit" class="font-medium" disabled={deleteChat.view.status === 'pending'}
+					>{deleteChat.view.status === 'pending' ? 'Cargando' : 'Eliminar'}</button
+				>
 				<input type="hidden" name="chat_id" value={chat.id} />
 			</form>
 		</div>
@@ -42,14 +49,19 @@
 	{/each}
 </div>
 
-<form method="post" action="?/startChat" class="p-2" use:enhance={handleStartChat}>
+<form method="post" action="?/startChat" class="p-2" use:enhance={startChat.enhance}>
+	{#if startChat.view.status === 'failure'}
+		<p>Error al iniciar el chat</p>
+	{/if}
 	<textarea name="content" placeholder="¿Por dónde partimos?"></textarea>
 	<select name="target_language">
-		{#each LANGUAGE_CODES as languageCode}
+		{#each LANGUAGE_CODES as languageCode (languageCode)}
 			{#if data.userProfile.nativeLanguage !== languageCode}
 				<option value={languageCode}>{LANGUAGE_CODE_LABELS.es[languageCode]}</option>
 			{/if}
 		{/each}
 	</select>
-	<button type="submit" class="font-medium">Enviar</button>
+	<button type="submit" class="font-medium" disabled={startChat.view.status === 'pending'}
+		>{startChat.view.status === 'pending' ? 'Cargando' : 'Enviar'}</button
+	>
 </form>

@@ -1,12 +1,10 @@
 import * as z from 'zod';
+import { defineFailure, defineSuccess } from './contract';
 
 export const SIGN_IN_ID = 'signIn' as const;
 
-export const signInFormKeys = [
-	{ name: 'email', method: 'get', default: '' },
-	{ name: 'password', method: 'get', default: '' }
-];
+export const signInSuccess = defineSuccess(z.null());
 
-export const signInFormSchema = z.object({ email: z.email(), password: z.string().min(1) });
-
-export type SignInFormData = z.infer<typeof signInFormSchema>;
+export const signInFailure = defineFailure(
+	z.object({ code: z.enum(['invalid_input', 'signin_failed', 'unexpected']) })
+);

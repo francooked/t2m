@@ -1,4 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { auth } from '$lib/server/auth';
 import { APIError } from 'better-auth/api';
@@ -7,10 +7,28 @@ import { LANGUAGE_CODES, TIME_ZONES } from '$lib/constants';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/db/schema';
 import { generatorParameters } from 'ts-fsrs';
-import { formFail } from '$lib/forms/result.server';
-import { SIGN_IN_ID } from '$lib/forms/sign-in';
-import { SIGN_UP_ID } from '$lib/forms/sign-up';
-import { SIGN_OUT_ID } from '$lib/forms/sign-out';
+import { createFormResponders } from '$lib/forms/result.server';
+import { SIGN_IN_ID, signInFailure, signInSuccess } from '$lib/forms/sign-in';
+import { SIGN_UP_ID, signUpFailure, signUpSuccess } from '$lib/forms/sign-up';
+import { SIGN_OUT_ID, signOutFailure, signOutSuccess } from '$lib/forms/sign-out';
+
+const signUpResponders = createFormResponders({
+	id: SIGN_UP_ID,
+	success: signUpSuccess,
+	failure: signUpFailure
+});
+
+const signInResponders = createFormResponders({
+	id: SIGN_IN_ID,
+	success: signInSuccess,
+	failure: signInFailure
+});
+
+const signOutResponders = createFormResponders({
+	id: SIGN_OUT_ID,
+	success: signOutSuccess,
+	failure: signOutFailure
+});
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (locals.user) return redirect(302, '/chat');
@@ -35,7 +53,7 @@ export const actions = {
 		});
 
 		if (formDataParse.error) {
-			return formFail({ id: SIGN_UP_ID, code: 'invalid_form_data', status: 400 });
+			return signUpResponders.fail({ error: { code: 'invalid_input' }, status: 400 });
 		}
 
 		try {
@@ -53,9 +71,9 @@ export const actions = {
 			});
 		} catch (error) {
 			if (error instanceof APIError) {
-				return formFail({ id: SIGN_UP_ID, code: 'signup_failed', status: 400 });
+				return signUpResponders.fail({ error: { code: 'signup_failed' }, status: 400 });
 			}
-			return formFail({ id: SIGN_UP_ID, code: 'unexpected', status: 500 });
+			return signUpResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
 
 		return redirect(303, '/chat');
@@ -72,16 +90,16 @@ export const actions = {
 		});
 
 		if (formDataParse.error) {
-			return formFail({ id: SIGN_IN_ID, code: 'invalid_form_data', status: 400 });
+			return signInResponders.fail({ error: { code: 'invalid_input' }, status: 400 });
 		}
 
 		try {
 			await auth.api.signInEmail({ body: { ...formDataParse.data } });
 		} catch (error) {
 			if (error instanceof APIError) {
-				return formFail({ id: SIGN_IN_ID, code: 'signin_failed', status: 400 });
+				return signInResponders.fail({ error: { code: 'signin_failed' }, status: 400 });
 			}
-			return formFail({ id: SIGN_IN_ID, code: 'unexpected', status: 500 });
+			return signInResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
 
 		return redirect(303, '/chat');
@@ -91,9 +109,9 @@ export const actions = {
 			await auth.api.signOut({ headers });
 		} catch (error) {
 			if (error instanceof APIError) {
-				return formFail({ id: SIGN_OUT_ID, code: 'signout_failed', status: 400 });
+				return signOutResponders.fail({ error: { code: 'signout_failed' }, status: 400 });
 			}
-			return formFail({ id: SIGN_OUT_ID, code: 'unexpected', status: 500 });
+			return signOutResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
 
 		return redirect(303, '/chat');

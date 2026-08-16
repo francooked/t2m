@@ -2,7 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import * as schema from '$lib/server/db/schema';
 import { db } from '$lib/server/db';
 import { and, asc, eq } from 'drizzle-orm';
-import { fail, redirect } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 import z from 'zod';
 import { requireUserSession } from '$lib/server/session-user';
 import { ChatTurnError, processChatTurn, retryCorrection, retryReply } from '$lib/server/chat-turn';
@@ -13,6 +13,18 @@ import {
 	narrowExercisePayload,
 	type SelectFnMap
 } from '$lib/server/exercise/narrow-exercise-payload';
+import { createFormResponders } from '$lib/forms/result.server';
+import {
+	REPLY_AND_CORRECT_ID,
+	replyAndCorrectFailure,
+	replyAndCorrectSuccess
+} from '$lib/forms/reply-and-correct';
+import { RETRY_REPLY_ID, retryReplyFailure, retryReplySuccess } from '$lib/forms/retry-reply';
+import {
+	RETRY_CORRECTION_ID,
+	retryCorrectionFailure,
+	retryCorrectionSuccess
+} from '$lib/forms/retry-correction';
 
 type BaseMessage = {
 	id: number;
@@ -31,6 +43,24 @@ type UserMessage = BaseMessage & {
 };
 
 type ChatMessage = AssistantMessage | UserMessage;
+
+const replyAndCorrectResponders = createFormResponders({
+	id: REPLY_AND_CORRECT_ID,
+	success: replyAndCorrectSuccess,
+	failure: replyAndCorrectFailure
+});
+
+const retryReplyResponders = createFormResponders({
+	id: RETRY_REPLY_ID,
+	success: retryReplySuccess,
+	failure: retryReplyFailure
+});
+
+const retryCorrectionResponders = createFormResponders({
+	id: RETRY_CORRECTION_ID,
+	success: retryCorrectionSuccess,
+	failure: retryCorrectionFailure
+});
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const signedInUser = requireUserSession(locals);
@@ -154,7 +184,8 @@ export const actions = {
 			content: formData.get('content')?.toString() ?? ''
 		});
 
-		if (!success) return fail(400, { code: 'invalid_input' });
+		if (!success)
+			return replyAndCorrectResponders.fail({ error: { code: 'invalid_input' }, status: 400 });
 
 		const chat = (
 			await db
@@ -163,7 +194,8 @@ export const actions = {
 				.where(and(eq(schema.chat.id, data.chatId), eq(schema.chat.userId, signedInUser.id)))
 		).at(0);
 
-		if (!chat) return fail(400, { code: 'chat_not_found' });
+		if (!chat)
+			return replyAndCorrectResponders.fail({ error: { code: 'chat_not_found' }, status: 400 });
 
 		const newMessages = await db
 			.insert(schema.message)
@@ -177,7 +209,10 @@ export const actions = {
 		const newAssistantMessage = newMessages.at(1);
 
 		if (!newUserMessage || !newAssistantMessage) {
-			return fail(500, { code: 'failed_to_create_messages' });
+			return replyAndCorrectResponders.fail({
+				error: { code: 'failed_to_create_messages' },
+				status: 500
+			});
 		}
 
 		try {
@@ -188,9 +223,13 @@ export const actions = {
 				assistantMessageId: newAssistantMessage.id
 			});
 		} catch (error) {
-			if (error instanceof ChatTurnError) return fail(400, { code: error.code });
-			throw error;
+			if (error instanceof ChatTurnError) {
+				return replyAndCorrectResponders.fail({ error: { code: 'chat_turn_error' }, status: 400 });
+			}
+			return replyAndCorrectResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
+
+		return replyAndCorrectResponders.ok({ data: null });
 	},
 	retryReply: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
@@ -203,7 +242,8 @@ export const actions = {
 			messageId: parseInt(formData.get('message_id')?.toString() ?? '-1')
 		});
 
-		if (!success) return fail(400, { code: 'invalid_input' });
+		if (!success)
+			return retryReplyResponders.fail({ error: { code: 'invalid_input' }, status: 400 });
 
 		try {
 			await retryReply({
@@ -212,9 +252,13 @@ export const actions = {
 				assistantMessageId: data.messageId
 			});
 		} catch (error) {
-			if (error instanceof ChatTurnError) return fail(400, { code: error.code });
-			throw error;
+			if (error instanceof ChatTurnError) {
+				return retryReplyResponders.fail({ error: { code: 'chat_turn_error' }, status: 400 });
+			}
+			return retryReplyResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
+
+		return retryReplyResponders.ok({ data: null });
 	},
 	retryCorrection: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
@@ -227,7 +271,12 @@ export const actions = {
 			messageId: parseInt(formData.get('message_id')?.toString() ?? '-1')
 		});
 
-		if (!success) return fail(400, { code: 'invalid_input' });
+		if (!success) {
+			return retryCorrectionResponders.fail({
+				error: { code: 'invalid_input' },
+				status: 400
+			});
+		}
 
 		try {
 			await retryCorrection({
@@ -236,8 +285,12 @@ export const actions = {
 				userMessageId: data.messageId
 			});
 		} catch (error) {
-			if (error instanceof ChatTurnError) return fail(400, { code: error.code });
-			throw error;
+			if (error instanceof ChatTurnError) {
+				return retryCorrectionResponders.fail({ error: { code: 'chat_turn_error' }, status: 400 });
+			}
+			return retryCorrectionResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
+
+		return retryCorrectionResponders.ok({ data: null });
 	}
 } satisfies Actions;
