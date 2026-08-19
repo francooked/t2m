@@ -10,7 +10,6 @@ import { generatorParameters } from 'ts-fsrs';
 import { createFormResponders } from '$lib/forms/result.server';
 import { SIGN_IN_ID, signInFailure, signInSuccess } from '$lib/forms/sign-in';
 import { SIGN_UP_ID, signUpFailure, signUpSuccess } from '$lib/forms/sign-up';
-import { SIGN_OUT_ID, signOutFailure, signOutSuccess } from '$lib/forms/sign-out';
 
 const signUpResponders = createFormResponders({
 	id: SIGN_UP_ID,
@@ -22,12 +21,6 @@ const signInResponders = createFormResponders({
 	id: SIGN_IN_ID,
 	success: signInSuccess,
 	failure: signInFailure
-});
-
-const signOutResponders = createFormResponders({
-	id: SIGN_OUT_ID,
-	success: signOutSuccess,
-	failure: signOutFailure
 });
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -100,18 +93,6 @@ export const actions = {
 				return signInResponders.fail({ error: { code: 'signin_failed' }, status: 400 });
 			}
 			return signInResponders.fail({ error: { code: 'unexpected' }, status: 500 });
-		}
-
-		return redirect(303, '/chat');
-	},
-	signOut: async ({ request: { headers } }) => {
-		try {
-			await auth.api.signOut({ headers });
-		} catch (error) {
-			if (error instanceof APIError) {
-				return signOutResponders.fail({ error: { code: 'signout_failed' }, status: 400 });
-			}
-			return signOutResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
 
 		return redirect(303, '/chat');

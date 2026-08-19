@@ -7,18 +7,22 @@
 	import type { PageProps } from './$types';
 
 	let { form }: PageProps = $props();
-	let signIn = createFormView({ id: SIGN_IN_ID, success: signInSuccess, failure: signInFailure });
-	let signUp = createFormView({ id: SIGN_UP_ID, success: signUpSuccess, failure: signUpFailure });
+
+	let signIn = createFormView({
+		id: SIGN_IN_ID,
+		success: signInSuccess,
+		failure: signInFailure,
+		getForm: () => form
+	});
+
+	let signUp = createFormView({
+		id: SIGN_UP_ID,
+		success: signUpSuccess,
+		failure: signUpFailure,
+		getForm: () => form
+	});
 
 	const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-	signIn.sync(() => form);
-	signUp.sync(() => form);
-
-	$effect(() => {
-		signIn.sync(() => form);
-		signUp.sync(() => form);
-	});
 </script>
 
 <form class="p-2" method="post" action="?/signInEmail" use:enhance={signIn.enhance}>

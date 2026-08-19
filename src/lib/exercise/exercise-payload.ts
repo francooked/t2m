@@ -1,10 +1,17 @@
 import z from 'zod';
 
-export const fullAnswerPayloadV1Schema = z.object({
-	front: z.string().min(1),
-	back: z.string().min(1),
-	extra: z.string().min(1)
-});
+export const exercisePayloadSchema = z.discriminatedUnion('type', [
+	z.discriminatedUnion('version', [
+		z.object({
+			type: z.literal('full_answer'),
+			version: z.literal(1),
+			payload: z.object({
+				front: z.string().min(1),
+				back: z.string().min(1),
+				extra: z.string().min(1)
+			})
+		})
+	])
+]);
 
-export type FullAnswerPayloadV1 = z.infer<typeof fullAnswerPayloadV1Schema>;
-export type ExercisePayload = FullAnswerPayloadV1;
+export type ExercisePayload = z.infer<typeof exercisePayloadSchema>['payload'];

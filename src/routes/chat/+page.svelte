@@ -11,21 +11,15 @@
 	let startChat = createFormView({
 		id: START_CHAT_ID,
 		success: startChatSuccess,
-		failure: startChatFailure
+		failure: startChatFailure,
+		getForm: () => form
 	});
 
 	let deleteChat = createFormView({
 		id: DELETE_CHAT_ID,
 		success: deleteChatSuccess,
-		failure: deleteChatFailure
-	});
-
-	startChat.sync(() => form);
-	deleteChat.sync(() => form);
-
-	$effect(() => {
-		startChat.sync(() => form);
-		deleteChat.sync(() => form);
+		failure: deleteChatFailure,
+		getForm: () => form
 	});
 </script>
 

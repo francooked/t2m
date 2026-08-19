@@ -7,7 +7,8 @@ import {
 	timestamp,
 	index,
 	jsonb,
-	primaryKey
+	primaryKey,
+	uniqueIndex
 } from 'drizzle-orm/pg-core';
 import { isNull } from 'drizzle-orm';
 import { user } from './auth.schema';
@@ -20,6 +21,7 @@ import {
 	TIME_ZONES
 } from '$lib/constants';
 import type { ExercisePayload } from '$lib/exercise/exercise-payload';
+import type { ExerciseCheckPayload } from '$lib/exercise/exercise-check-payload';
 
 export const languageCodeEnum = pgEnum('language_code', LANGUAGE_CODES);
 export const messageRoleEnum = pgEnum('message_role', ROLES);
@@ -115,6 +117,25 @@ export const exercise = pgTable(
 		index('exercise_userid_createdat_desc_active_idx')
 			.on(table.userId, table.createdAt.desc())
 			.where(isNull(table.archivedAt))
+	]
+);
+
+export const exerciseCheck = pgTable(
+	'exercise_check',
+	{
+		id: serial('id').primaryKey(),
+		exerciseId: integer('exercise_id')
+			.references(() => exercise.id, { onDelete: 'cascade' })
+			.notNull(),
+		payload: jsonb('payload').$type<ExerciseCheckPayload>().notNull(),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		ratedAt: timestamp('rated_at')
+	},
+	(table) => [
+		index('exercisecheck_id_createdat_desc_idx').on(table.exerciseId, table.createdAt.desc()),
+		uniqueIndex('exercisecheck_exerciseid_unrated_uq')
+			.on(table.exerciseId)
+			.where(isNull(table.ratedAt))
 	]
 );
 

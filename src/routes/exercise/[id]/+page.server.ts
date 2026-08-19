@@ -2,44 +2,25 @@ import { requireUserSession } from '$lib/server/session-user';
 import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import * as schema from '$lib/server/db/schema';
-import * as fsrsSchema from '$lib/server/db/fsrs.schema';
 import { db } from '$lib/server/db';
 import { and, eq, isNull } from 'drizzle-orm';
-import {
-	narrowExercisePayload,
-	type SelectFnMap
-} from '$lib/server/exercise/narrow-exercise-payload';
 import z from 'zod';
 import Groq from 'groq-sdk';
 import { GROQ_API_KEY } from '$env/static/private';
 import { buildPrompt, outputSchema } from '$lib/prompts/translation-feedback';
-import { createEmptyCard, fsrs, Rating, type StepUnit } from 'ts-fsrs';
-import {
-	resolveNextNewExercises,
-	resolveNextPendingExercises
-} from '$lib/server/exercise/next-exercise';
 import { tokenize } from '$lib/correction/tokenize';
 import { diffArrays } from 'diff';
 import { ChatTurnError } from '$lib/server/chat-turn';
 import { retry } from '$lib/server/retry';
 import { createFormResponders } from '$lib/forms/result.server';
 import { CHECK_ANSWER_ID, checkAnswerFailure, checkAnswerSuccess } from '$lib/forms/check-answer';
-import {
-	ANSWER_EXERCISE_ID,
-	answerExerciseFailure,
-	answerExerciseSuccess
-} from '$lib/forms/answer-exercise';
+
+import { parseExercisePayload, toPublicExercisePayload } from '$lib/exercise/parse-exercise';
 
 const checkAnswer = createFormResponders({
 	id: CHECK_ANSWER_ID,
 	success: checkAnswerSuccess,
 	failure: checkAnswerFailure
-});
-
-const answerExercise = createFormResponders({
-	id: ANSWER_EXERCISE_ID,
-	success: answerExerciseSuccess,
-	failure: answerExerciseFailure
 });
 
 async function parseLlmResponse<T extends z.ZodType>(content: any, schema: T) {
@@ -57,11 +38,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const signedInUser = requireUserSession(locals);
 	if (!signedInUser) return redirect(302, '/login');
 
-	const selectFn = {
-		full_answer: {
-			1: ({ front, extra }) => ({ front, extra })
-		}
-	} satisfies SelectFnMap;
+	const exerciseId = Number(params.id);
 
 	const exercise = (
 		await db
@@ -74,16 +51,36 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			.from(schema.exercise)
 			.where(
 				and(
-					eq(schema.exercise.id, parseInt(params.id)),
+					eq(schema.exercise.id, exerciseId),
 					eq(schema.exercise.userId, signedInUser.id),
 					isNull(schema.exercise.archivedAt)
 				)
 			)
 	)
-		.map((row) => narrowExercisePayload(row, selectFn))
+		.map(({ id, ...rest }) => ({
+			id,
+			...toPublicExercisePayload(parseExercisePayload(rest))
+		}))
 		.at(0);
 
 	if (!exercise) return redirect(302, '/exercise');
+
+	const exerciseCheck = (
+		await db
+			.select({ id: schema.exerciseCheck.id })
+			.from(schema.exerciseCheck)
+			.innerJoin(schema.exercise, eq(schema.exerciseCheck.exerciseId, schema.exercise.id))
+			.where(
+				and(
+					eq(schema.exerciseCheck.exerciseId, exerciseId),
+					eq(schema.exercise.userId, signedInUser.id),
+					isNull(schema.exerciseCheck.ratedAt)
+				)
+			)
+			.limit(1)
+	).at(0);
+
+	if (exerciseCheck) return redirect(302, `/exercise/${exerciseId}/review`);
 
 	return { exercise };
 };
@@ -107,12 +104,6 @@ export const actions = {
 			return checkAnswer.fail({ error: { code: 'invalid_input' }, status: 400 });
 		}
 
-		const selectFn = {
-			full_answer: {
-				1: ({ front, back, extra }) => ({ front, back, extra })
-			}
-		} satisfies SelectFnMap;
-
 		const exercise = (
 			await db
 				.select({
@@ -134,14 +125,32 @@ export const actions = {
 				)
 				.limit(1)
 		)
-			.map(({ targetLanguage, nativeLanguage, ...rest }) => ({
+			.map(({ id, targetLanguage, nativeLanguage, ...rest }) => ({
+				id,
 				targetLanguage,
 				nativeLanguage,
-				...narrowExercisePayload(rest, selectFn)
+				...parseExercisePayload(rest)
 			}))
 			.at(0);
 
 		if (!exercise) return redirect(302, '/exercise');
+
+		const exerciseCheck = (
+			await db
+				.select({ id: schema.exerciseCheck.id })
+				.from(schema.exerciseCheck)
+				.innerJoin(schema.exercise, eq(schema.exerciseCheck.exerciseId, schema.exercise.id))
+				.where(
+					and(
+						eq(schema.exerciseCheck.exerciseId, formDataParse.data.exerciseId),
+						eq(schema.exercise.userId, signedInUser.id),
+						isNull(schema.exerciseCheck.ratedAt)
+					)
+				)
+				.limit(1)
+		).at(0);
+
+		if (exerciseCheck) return redirect(302, `/exercise/${formDataParse.data.exerciseId}/review`);
 
 		if (exercise.type === 'full_answer' && exercise.version === 1) {
 			const differences = diffArrays(
@@ -150,14 +159,19 @@ export const actions = {
 			).map(({ added, removed, value }) => ({ added, removed, value: value.join('') }));
 
 			if (differences.length === 1 && !differences.at(0)?.added && !differences.at(0)?.removed) {
-				return checkAnswer.ok({
-					data: {
-						expected: exercise.payload.back,
-						answer: formDataParse.data.answer,
-						differences,
-						tips: []
-					}
-				});
+				const exerciseCheck = (
+					await db
+						.insert(schema.exerciseCheck)
+						.values({
+							exerciseId: formDataParse.data.exerciseId,
+							payload: { answer: formDataParse.data.answer, tips: [] }
+						})
+						.returning({ id: schema.exerciseCheck.id })
+				).at(0);
+
+				if (!exerciseCheck) throw new Error('Failed to create exercise check');
+
+				return redirect(303, `/exercise/${formDataParse.data.exerciseId}/review`);
 			}
 
 			const groqClient = new Groq({ apiKey: GROQ_API_KEY });
@@ -192,13 +206,9 @@ export const actions = {
 					}
 				});
 
-				return checkAnswer.ok({
-					data: {
-						expected: exercise.payload.back,
-						answer: formDataParse.data.answer,
-						tips: llmResponse.tips,
-						differences
-					}
+				await db.insert(schema.exerciseCheck).values({
+					exerciseId: exercise.id,
+					payload: { answer: formDataParse.data.answer, tips: llmResponse.tips }
 				});
 			} catch (error) {
 				if (error instanceof ChatTurnError) {
@@ -212,186 +222,7 @@ export const actions = {
 				status: 400
 			});
 		}
-	},
-	answerExercise: async ({ request, locals }) => {
-		const signedInUser = requireUserSession(locals);
-		if (!signedInUser) return redirect(302, '/login');
 
-		const formData = await request.formData();
-		const formDataSchema = z.object({
-			exerciseId: z.number(),
-			rating: z.enum(['again', 'hard', 'good', 'easy'])
-		});
-		const formDataParse = formDataSchema.safeParse({
-			exerciseId: parseInt(formData.get('exercise_id')?.toString() ?? '-1'),
-			rating: formData.get('rating')?.toString() ?? ''
-		});
-
-		if (!formDataParse.success) {
-			return answerExercise.fail({ error: { code: 'invalid_input' }, status: 400 });
-		}
-
-		const userProfile = (
-			await db
-				.select({ timeZone: schema.userProfile.timeZone })
-				.from(schema.userProfile)
-				.where(eq(schema.userProfile.userId, signedInUser.id))
-		).at(0);
-
-		if (!userProfile) {
-			return redirect(302, '/login');
-		}
-
-		const userSrsProfile = (
-			await db
-				.select({ algorithm: schema.userSrsProfile.algorithm, setup: schema.userSrsProfile.setup })
-				.from(schema.userSrsProfile)
-				.where(and(eq(schema.userSrsProfile.userId, signedInUser.id)))
-				.limit(1)
-		).at(0);
-
-		if (!userSrsProfile) return redirect(302, '/exercise');
-
-		const reviewDate = new Date();
-
-		if (userSrsProfile.algorithm === 'fsrs') {
-			const fsrsParametersSchema = z
-				.object({
-					enable_short_term: z.literal(true),
-					enable_fuzz: z.boolean(),
-					learning_steps: z.array(
-						z
-							.string()
-							.regex(/^\d+[mhd]$/)
-							.transform((value) => value as StepUnit)
-					),
-					maximum_interval: z.number(),
-					relearning_steps: z.array(
-						z
-							.string()
-							.regex(/^\d+[mhd]$/)
-							.transform((value) => value as StepUnit)
-					),
-					request_retention: z.number(),
-					w: z.array(z.number())
-				})
-				.partial();
-
-			const fsrsParametersParse = fsrsParametersSchema.safeParse(userSrsProfile.setup);
-			if (!fsrsParametersParse.success) {
-				return answerExercise.fail({ error: { code: 'invalid_fsrs_parameters' }, status: 400 });
-			}
-
-			const fsrsCard = (
-				await db
-					.select({
-						id: fsrsSchema.fsrsCard.id,
-						stateBlob: fsrsSchema.fsrsCard.stateBlob,
-						nextDueAt: fsrsSchema.fsrsCard.nextDueAt
-					})
-					.from(fsrsSchema.fsrsCard)
-					.where(
-						and(
-							eq(fsrsSchema.fsrsCard.userId, signedInUser.id),
-							eq(fsrsSchema.fsrsCard.exerciseId, formDataParse.data.exerciseId)
-						)
-					)
-					.limit(1)
-			).at(0);
-
-			const ratingToFsrsRating = {
-				again: Rating.Again,
-				hard: Rating.Hard,
-				good: Rating.Good,
-				easy: Rating.Easy
-			} as const;
-
-			const scheduler = fsrs(fsrsParametersParse.data);
-
-			if (!fsrsCard) {
-				const emptyFsrsCard = createEmptyCard(reviewDate);
-				const recordLogItem = scheduler.next(
-					emptyFsrsCard,
-					reviewDate,
-					ratingToFsrsRating[formDataParse.data.rating]
-				);
-
-				await db.transaction(async (tx) => {
-					const fsrsCard = (
-						await tx
-							.insert(fsrsSchema.fsrsCard)
-							.values({
-								userId: signedInUser.id,
-								exerciseId: formDataParse.data.exerciseId,
-								stateBlob: recordLogItem.card,
-								nextDueAt: recordLogItem.card.due
-							})
-							.returning({ id: fsrsSchema.fsrsCard.id })
-					).at(0);
-
-					// This should never happen.
-					if (!fsrsCard) throw new Error('Failed to create FSRS card in database');
-
-					await tx.insert(fsrsSchema.fsrsReviewLog).values({
-						userId: signedInUser.id,
-						fsrsCardId: fsrsCard.id,
-						reviewedAt: reviewDate,
-						rating: formDataParse.data.rating,
-						stateBlob: recordLogItem.log
-					});
-				});
-			} else {
-				const recordLogItem = scheduler.next(
-					fsrsCard.stateBlob,
-					reviewDate,
-					ratingToFsrsRating[formDataParse.data.rating]
-				);
-
-				await db.transaction(async (tx) => {
-					await tx
-						.update(fsrsSchema.fsrsCard)
-						.set({ stateBlob: recordLogItem.card, nextDueAt: recordLogItem.card.due })
-						.where(
-							and(
-								eq(fsrsSchema.fsrsCard.userId, signedInUser.id),
-								eq(fsrsSchema.fsrsCard.exerciseId, formDataParse.data.exerciseId)
-							)
-						);
-					await tx.insert(fsrsSchema.fsrsReviewLog).values({
-						userId: signedInUser.id,
-						fsrsCardId: fsrsCard.id,
-						reviewedAt: reviewDate,
-						rating: formDataParse.data.rating,
-						stateBlob: recordLogItem.log
-					});
-				});
-			}
-		} else {
-			return answerExercise.fail({ error: { code: 'invalid_srs_algorithm' }, status: 400 });
-		}
-
-		const nextPendingExercise = (
-			await resolveNextPendingExercises({
-				userId: signedInUser.id,
-				timeZone: userProfile.timeZone,
-				reviewDate
-			})
-		).at(0);
-
-		if (nextPendingExercise) {
-			return redirect(302, `/exercise/${nextPendingExercise.id}`);
-		}
-
-		const nextNewExercise = (
-			await resolveNextNewExercises({
-				userId: signedInUser.id
-			})
-		).at(0);
-
-		if (nextNewExercise) {
-			return redirect(302, `/exercise/${nextNewExercise.id}`);
-		}
-
-		return redirect(302, '/exercise');
+		return redirect(303, `/exercise/${formDataParse.data.exerciseId}/review`);
 	}
 } satisfies Actions;

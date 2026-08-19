@@ -9,10 +9,6 @@ import { ChatTurnError, processChatTurn, retryCorrection, retryReply } from '$li
 import { normalizeText } from '$lib/correction/normalize-text';
 import { buildBlame } from '$lib/correction/build-blame';
 import { traceRewriteHistory, type Segment } from '$lib/correction/segments';
-import {
-	narrowExercisePayload,
-	type SelectFnMap
-} from '$lib/server/exercise/narrow-exercise-payload';
 import { createFormResponders } from '$lib/forms/result.server';
 import {
 	REPLY_AND_CORRECT_ID,
@@ -25,6 +21,7 @@ import {
 	retryCorrectionFailure,
 	retryCorrectionSuccess
 } from '$lib/forms/retry-correction';
+import { exercisePayloadSchema } from '$lib/exercise/exercise-payload';
 
 type BaseMessage = {
 	id: number;
@@ -136,12 +133,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		};
 	});
 
-	const selectFn = {
-		full_answer: {
-			1: ({ front, back, extra }) => ({ front, back, extra })
-		}
-	} satisfies SelectFnMap;
-
 	const exercises = (
 		await db
 			.select({
@@ -160,7 +151,14 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			.innerJoin(schema.chat, eq(schema.message.chatId, schema.chat.id))
 			.where(eq(schema.chat.id, chat.id))
 			.orderBy(asc(schema.exercise.id))
-	).map((row) => narrowExercisePayload(row, selectFn));
+	).map((row) => {
+		const payload = exercisePayloadSchema.parse({
+			type: row.type,
+			version: row.version,
+			payload: row.payload
+		});
+		return { id: row.id, ...payload };
+	});
 
 	return { messages, exercises };
 };

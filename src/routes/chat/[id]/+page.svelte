@@ -19,30 +19,26 @@
 	const { data, params, form }: PageProps = $props();
 	const popover = new Popover();
 	let triggerData = $state<{ reason: string } | null>();
+
 	let replyAndCorrect = createFormView({
 		id: REPLY_AND_CORRECT_ID,
 		success: replyAndCorrectSuccess,
-		failure: replyAndCorrectFailure
+		failure: replyAndCorrectFailure,
+		getForm: () => form
 	});
+
 	let retryReply = createFormView({
 		id: RETRY_REPLY_ID,
 		success: retryReplySuccess,
-		failure: retryReplyFailure
+		failure: retryReplyFailure,
+		getForm: () => form
 	});
+
 	let retryCorrection = createFormView({
 		id: RETRY_CORRECTION_ID,
 		success: retryCorrectionSuccess,
-		failure: retryCorrectionFailure
-	});
-
-	replyAndCorrect.sync(() => form);
-	retryReply.sync(() => form);
-	retryCorrection.sync(() => form);
-
-	$effect(() => {
-		replyAndCorrect.sync(() => form);
-		retryReply.sync(() => form);
-		retryCorrection.sync(() => form);
+		failure: retryCorrectionFailure,
+		getForm: () => form
 	});
 </script>
 

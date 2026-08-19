@@ -6,76 +6,84 @@ export function createFormView<
 	Id extends string,
 	Success extends z.ZodType,
 	Failure extends z.ZodType<{ code: string }>
->({ id, success, failure }: { id: Id; success: Success; failure: Failure }) {
+>({
+	id,
+	success,
+	failure,
+	getForm
+}: {
+	id: Id;
+	success: Success;
+	failure: Failure;
+	getForm: () => unknown;
+}) {
 	const schema = buildContract({ id, success, failure });
 
-	let view = $state<
+	let pending = $state<boolean>(false);
+	let unexpected = $state<boolean>(false);
+
+	const parsed = $derived.by(() => {
+		const form = getForm();
+
+		if (form === null || typeof form !== 'object' || !('id' in form) || form.id !== id) {
+			return null;
+		}
+
+		const result = schema.safeParse(form);
+
+		if (!result.success) {
+			throw new Error('Form result does not satisfy the contract');
+		}
+
+		return result.data as InferFormResult<Id, Success, Failure>;
+	});
+
+	const view = $derived.by<
 		| { status: 'idle'; id: Id }
 		| { status: 'pending'; id: Id }
 		| { status: 'success'; id: Id; data: z.output<Success> }
 		| { status: 'failure'; id: Id; error: z.output<Failure> | { code: 'unexpected' } }
-	>({ id, status: 'idle' });
+	>(() => {
+		if (pending) return { status: 'pending' as const, id };
 
-	const parseResult = (raw: unknown) => {
-		const parsed = schema.safeParse(raw);
-
-		if (!parsed.success) {
-			throw new Error('Form result did not satisfy the contract');
+		if (parsed?.kind === 'success') {
+			return { status: 'success' as const, id, data: parsed.data };
 		}
 
-		return parsed.data as unknown as InferFormResult<Id, Success, Failure>;
-	};
+		if (parsed?.kind === 'failure') {
+			return { status: 'failure' as const, id, error: parsed.error };
+		}
+
+		if (unexpected) {
+			return { status: 'failure' as const, id, error: { code: 'unexpected' as const } };
+		}
+
+		return { status: 'idle' as const, id };
+	});
 
 	const enhance: SubmitFunction = () => {
-		view = { id, status: 'pending' };
+		pending = true;
+		unexpected = false;
 
 		return async ({ result, update }) => {
+			pending = false;
+
 			if (result.type === 'error') {
-				view = { id, status: 'failure', error: { code: 'unexpected' } };
+				unexpected = true;
 				return;
 			}
 
 			if (result.type === 'redirect') {
-				view = { id, status: 'idle' };
 				await update();
 				return;
-			}
-
-			const payload = parseResult(result.data);
-
-			if (payload.kind === 'success') {
-				view = { status: 'success', id, data: payload.data };
-			} else {
-				view = { status: 'failure', id, error: payload.error };
 			}
 
 			await update({ reset: result.type === 'success' });
 		};
 	};
 
-	const sync = (getForm: () => unknown) => {
-		if (view.status === 'pending') return;
-
-		const form = getForm();
-		if (form === null) return;
-
-		if (typeof form !== 'object' || !('id' in form) || form.id !== id) {
-			if (view.status !== 'idle') view = { id, status: 'idle' };
-			return;
-		}
-
-		const payload = parseResult(form);
-
-		if (payload.kind === 'success') {
-			view = { status: 'success', id, data: payload.data };
-		} else {
-			view = { status: 'failure', id, error: payload.error };
-		}
-	};
-
 	return {
 		enhance,
-		sync,
 		get view() {
 			return view;
 		}
