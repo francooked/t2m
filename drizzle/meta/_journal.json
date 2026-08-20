@@ -148,6 +148,13 @@
       "when": 1786989676886,
       "tag": "0020_spicy_gargoyle",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787235143432,
+      "tag": "0021_dashing_wallop",
+      "breakpoints": true
     }
   ]
 }

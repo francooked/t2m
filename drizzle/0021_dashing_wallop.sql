@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "exercisecheck_exerciseid_unrated_uq" ON "exercise_check" USING btree ("exercise_id") WHERE "exercise_check"."rated_at" is null;
