@@ -6,7 +6,8 @@ import * as schema from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import {
 	resolveNextNewExercises,
-	resolveNextPendingExercises
+	resolveNextPendingExercises,
+	resolveNextUnratedExercises
 } from '$lib/server/exercise/next-exercise';
 import { parseExercisePayload, toPublicExercisePayload } from '$lib/exercise/parse-exercise';
 
@@ -27,6 +28,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	const reviewDate = new Date();
 
+	const unratedExercises = (await resolveNextUnratedExercises({ userId: signedInUser.id })).map(
+		({ id, ...rest }) => ({ id, ...toPublicExercisePayload(parseExercisePayload(rest)) })
+	);
+
 	const pendingExercises = (
 		await resolveNextPendingExercises({
 			userId: signedInUser.id,
@@ -42,5 +47,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		})
 	).map(({ id, ...rest }) => ({ id, ...toPublicExercisePayload(parseExercisePayload(rest)) }));
 
-	return { newExercises, pendingExercises };
+	const nextExercise =
+		unratedExercises.at(0) ?? pendingExercises.at(0) ?? newExercises.at(0) ?? null;
+
+	return { newExercises, pendingExercises, unratedExercises, nextExercise };
 };

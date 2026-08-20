@@ -19,7 +19,8 @@ import * as z from 'zod';
 import { createEmptyCard, fsrs, Rating, type StepUnit } from 'ts-fsrs';
 import {
 	resolveNextNewExercises,
-	resolveNextPendingExercises
+	resolveNextPendingExercises,
+	resolveNextUnratedExercises
 } from '$lib/server/exercise/next-exercise';
 
 const answerExercise = createFormResponders({
@@ -83,7 +84,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	if (!exerciseCheck) return redirect(302, `/exercise/${exerciseId}`);
 
-	if (exercise.type === 'full_answer' && exercise.version) {
+	if (exercise.type === 'full_answer' && exercise.version === 1) {
 		const differences = diffArrays(
 			tokenize(exerciseCheck.payload.answer, exercise.targetLanguage),
 			tokenize(exercise.payload.back, exercise.targetLanguage)
@@ -298,6 +299,14 @@ export const actions = {
 			});
 		} else {
 			return answerExercise.fail({ error: { code: 'invalid_srs_algorithm' }, status: 400 });
+		}
+
+		const nextUnratedExercise = (await resolveNextUnratedExercises({ userId: signedInUser.id })).at(
+			0
+		);
+
+		if (nextUnratedExercise) {
+			return redirect(302, `/exercise/${nextUnratedExercise.id}`);
 		}
 
 		const nextPendingExercise = (

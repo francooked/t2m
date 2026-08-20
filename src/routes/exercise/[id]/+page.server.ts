@@ -3,7 +3,7 @@ import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import * as schema from '$lib/server/db/schema';
 import { db } from '$lib/server/db';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import z from 'zod';
 import Groq from 'groq-sdk';
 import { GROQ_API_KEY } from '$env/static/private';
@@ -14,7 +14,6 @@ import { ChatTurnError } from '$lib/server/chat-turn';
 import { retry } from '$lib/server/retry';
 import { createFormResponders } from '$lib/forms/result.server';
 import { CHECK_ANSWER_ID, checkAnswerFailure, checkAnswerSuccess } from '$lib/forms/check-answer';
-
 import { parseExercisePayload, toPublicExercisePayload } from '$lib/exercise/parse-exercise';
 
 const checkAnswer = createFormResponders({
@@ -22,6 +21,27 @@ const checkAnswer = createFormResponders({
 	success: checkAnswerSuccess,
 	failure: checkAnswerFailure
 });
+
+async function persistUnratedCheck({
+	exerciseId,
+	payload
+}: Pick<typeof schema.exerciseCheck.$inferInsert, 'exerciseId' | 'payload'>) {
+	const exerciseCheck = (
+		await db
+			.insert(schema.exerciseCheck)
+			.values({ exerciseId, payload })
+			.onConflictDoUpdate({
+				target: schema.exerciseCheck.exerciseId,
+				targetWhere: isNull(schema.exerciseCheck.ratedAt),
+				set: { payload: sql`${schema.exerciseCheck.payload}` }
+			})
+			.returning({ id: schema.exerciseCheck.id })
+	).at(0);
+
+	if (!exerciseCheck) throw new Error('Failed to persist exercise check');
+
+	return exerciseCheck;
+}
 
 async function parseLlmResponse<T extends z.ZodType>(content: any, schema: T) {
 	try {
@@ -86,6 +106,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions = {
+	// A better name for this action would be `review`.
 	checkAnswer: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
 		if (!signedInUser) return redirect(302, '/login');
@@ -135,14 +156,14 @@ export const actions = {
 
 		if (!exercise) return redirect(302, '/exercise');
 
-		const exerciseCheck = (
+		const existingExerciseCheck = (
 			await db
 				.select({ id: schema.exerciseCheck.id })
 				.from(schema.exerciseCheck)
 				.innerJoin(schema.exercise, eq(schema.exerciseCheck.exerciseId, schema.exercise.id))
 				.where(
 					and(
-						eq(schema.exerciseCheck.exerciseId, formDataParse.data.exerciseId),
+						eq(schema.exerciseCheck.exerciseId, exercise.id),
 						eq(schema.exercise.userId, signedInUser.id),
 						isNull(schema.exerciseCheck.ratedAt)
 					)
@@ -150,7 +171,7 @@ export const actions = {
 				.limit(1)
 		).at(0);
 
-		if (exerciseCheck) return redirect(302, `/exercise/${formDataParse.data.exerciseId}/review`);
+		if (existingExerciseCheck) return redirect(302, `/exercise/${exercise.id}/review`);
 
 		if (exercise.type === 'full_answer' && exercise.version === 1) {
 			const differences = diffArrays(
@@ -159,19 +180,12 @@ export const actions = {
 			).map(({ added, removed, value }) => ({ added, removed, value: value.join('') }));
 
 			if (differences.length === 1 && !differences.at(0)?.added && !differences.at(0)?.removed) {
-				const exerciseCheck = (
-					await db
-						.insert(schema.exerciseCheck)
-						.values({
-							exerciseId: formDataParse.data.exerciseId,
-							payload: { answer: formDataParse.data.answer, tips: [] }
-						})
-						.returning({ id: schema.exerciseCheck.id })
-				).at(0);
+				await persistUnratedCheck({
+					exerciseId: exercise.id,
+					payload: { answer: formDataParse.data.answer, tips: [] }
+				});
 
-				if (!exerciseCheck) throw new Error('Failed to create exercise check');
-
-				return redirect(303, `/exercise/${formDataParse.data.exerciseId}/review`);
+				return redirect(303, `/exercise/${exercise.id}/review`);
 			}
 
 			const groqClient = new Groq({ apiKey: GROQ_API_KEY });
@@ -206,11 +220,12 @@ export const actions = {
 					}
 				});
 
-				await db.insert(schema.exerciseCheck).values({
+				await persistUnratedCheck({
 					exerciseId: exercise.id,
 					payload: { answer: formDataParse.data.answer, tips: llmResponse.tips }
 				});
 			} catch (error) {
+				console.log(error);
 				if (error instanceof ChatTurnError) {
 					return checkAnswer.fail({ error: { code: 'chat_turn_error' }, status: 400 });
 				}
@@ -223,6 +238,6 @@ export const actions = {
 			});
 		}
 
-		return redirect(303, `/exercise/${formDataParse.data.exerciseId}/review`);
+		return redirect(303, `/exercise/${exercise.id}/review`);
 	}
 } satisfies Actions;
