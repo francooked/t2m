@@ -1,5 +1,5 @@
 import type { LANGUAGE_CODES } from '$lib/constants';
-import { lcs, type LCSOperation } from './lcs';
+import { diffArrays } from 'diff';
 import { tokenize } from './tokenize';
 
 export type Cell = {
@@ -11,35 +11,32 @@ export type Cell = {
 
 export type Rewrite = { sentence: string; reason: string };
 
-function applyLCSOperationsToCells(
+function applyDifferencesToCells(
 	cells: Cell[],
-	operations: LCSOperation[],
+	operations: { added: boolean; removed: boolean; value: string[] }[],
 	rewriteIndex: number
 ): Cell[] {
 	const updatedCells: Cell[] = [];
 	let index = 0;
 
-	for (const operation of operations) {
-		if (operation.type === 'insert') {
-			updatedCells.push({
-				text: operation.token,
-				status: 'alive',
-				bornRewriteIndex: rewriteIndex,
-				diedRewriteIndex: null
-			});
-			continue;
-		}
+	for (const { added, removed, value } of operations) {
+		for (const token of value) {
+			while (index < cells.length && cells[index].status === 'dead') {
+				updatedCells.push(cells[index++]);
+			}
 
-		while (index < cells.length && cells[index].status === 'dead') {
-			updatedCells.push(cells[index++]);
-		}
-
-		const cell = cells[index++];
-
-		if (operation.type === 'equal') {
-			updatedCells.push(cell);
-		} else {
-			updatedCells.push({ ...cell, status: 'dead', diedRewriteIndex: rewriteIndex });
+			if (added) {
+				updatedCells.push({
+					text: token,
+					status: 'alive',
+					bornRewriteIndex: rewriteIndex,
+					diedRewriteIndex: null
+				});
+			} else if (removed) {
+				updatedCells.push({ ...cells[index++], status: 'dead', diedRewriteIndex: rewriteIndex });
+			} else {
+				updatedCells.push(cells[index++]);
+			}
 		}
 	}
 
@@ -64,11 +61,8 @@ export function buildBlame(
 
 	rewrites.forEach((rewrite, index) => {
 		const aliveTexts = cells.filter((cell) => cell.status === 'alive').map((cell) => cell.text);
-		cells = applyLCSOperationsToCells(
-			cells,
-			lcs(aliveTexts, tokenize(rewrite.sentence, languageCode)),
-			index
-		);
+		const differences = diffArrays(aliveTexts, tokenize(rewrite.sentence, languageCode));
+		cells = applyDifferencesToCells(cells, differences, index);
 	});
 
 	return cells;
