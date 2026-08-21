@@ -1,0 +1,32 @@
+---
+description: Meta del MVP — conversación, repaso de errores y retroalimentación
+alwaysApply: true
+---
+
+# Visión del producto (MVP)
+
+Este repo es un **MVP de asistente de idiomas**. La meta no es una app “bonita”: es **cerrar el ciclo de aprendizaje** con soluciones simples.
+
+## Los tres pilares
+
+1. **Conversación** — El usuario chatea; el sistema responde y corrige. **Cubierto.**
+2. **Repaso de errores** — Los errores se convierten en ejercicios de respuesta completa (**full answer**) y se repasan con **FSRS**. **Cubierto.**
+3. **Retroalimentación** — El usuario ve en qué se sigue equivocando. Los errores se capturan del **chat** y de los **repasos**. Un **resumen periódico** (semanal o mensual) basta; no hace falta un sistema de métricas.
+
+## Prioridad para sugerencias de código y diseño
+
+Enfocar el trabajo en, y solo expandir dentro de, este anillo:
+
+- **Conversación**: iniciar y mantener el chat (flujo estable). No ampliar el alcance salvo que desbloquee el ciclo.
+- **Repaso**: un solo tipo de ejercicio (**full answer**) + FSRS. No introducir otros formatos salvo que el usuario lo pida.
+- **Retroalimentación**: un resumen simple de errores recurrentes. Periodo flexible. Sin dashboards ni métricas sofisticadas.
+
+## Lo que no es prioridad
+
+- **UI pulida** (tipografía, animaciones, layouts “de producto final”).
+- Features que no cierren el ciclo: conversar → repasar → ver en qué se sigue fallando.
+- Resolver de más: métricas finas, periodos rígidos, o analítica que no aporte al resumen.
+
+## Criterio de decisión
+
+Mantener la **simpleza**. No todo tiene que estar resuelto. Si una sugerencia no ayuda a **cerrar el ciclo de aprendizaje**, dejarla fuera. Preferir cambios pequeños que completen el camino de punta a punta.

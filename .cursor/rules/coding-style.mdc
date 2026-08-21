@@ -1,0 +1,42 @@
+---
+description: Estilo de programación personal — nombres, funciones, comentarios y complejidad
+alwaysApply: true
+---
+
+# Estilo de programación
+
+## Variables
+
+- Prefiere nombres **cortos y autoexplicativos**.
+- Usa abreviaciones solo cuando el **contexto ya las hace claras** (ej. `idx`, `msg`, `err` en un loop o handler).
+- Si la abreviación ayuda pero no es obvia, añade un **comentario breve en inglés**:
+
+```typescript
+// FSRS card state for spaced repetition scheduling
+const fsrs = getCardState(exerciseId);
+```
+
+## Funciones
+
+- Acepta **verbosidad en nombres de funciones**: deben dejar claro qué hacen.
+- Siempre incluye una **descripción breve en inglés** (JSDoc o comentario de una línea):
+
+```typescript
+/** Returns exercises due for review based on FSRS scheduling. */
+function getDueExercisesForReview(userId: string): Exercise[] { ... }
+```
+
+## Comentarios
+
+- Comenta **solo** donde el código podría ser un cuello de botella para entenderlo (lógica no obvia, trade-offs de performance, invariantes).
+- No comentes lo que el código ya dice por sí mismo.
+
+## Complejidad y estructuras de datos
+
+- Prioriza **complejidad computacional** razonable; evita algoritmos innecesariamente costosos.
+- Prefiere **estructuras de datos apropiadas** (Map/Set para lookups, índices, agrupaciones) en lugar de búsquedas repetidas en arrays.
+
+## Legibilidad y modularidad
+
+- Prioriza **legibilidad** y **modularidad**: funciones con una responsabilidad clara, extracción cuando un bloque mezcla niveles de abstracción.
+- Mantén el código simple; modulariza solo cuando mejora el entendimiento o evita duplicación real.
