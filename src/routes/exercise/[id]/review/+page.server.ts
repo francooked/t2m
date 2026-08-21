@@ -16,7 +16,7 @@ import {
 	answerExerciseSuccess
 } from '$lib/forms/answer-exercise';
 import * as z from 'zod';
-import { createEmptyCard, fsrs, Rating, type StepUnit } from 'ts-fsrs';
+import { createEmptyCard, fsrs, Rating, type StepUnit, TypeConvert } from 'ts-fsrs';
 import {
 	resolveNextNewExercises,
 	resolveNextPendingExercises,
@@ -273,7 +273,9 @@ export const actions = {
 					});
 				} else {
 					const recordLogItem = scheduler.next(
-						existingFsrsCard.stateBlob,
+						// Convert the state blob to a card object.
+						// Dates are stored as strings, so we need to convert them to Date objects.
+						TypeConvert.card(existingFsrsCard.stateBlob),
 						reviewDate,
 						ratingToFsrsRating[formDataParse.data.rating]
 					);
