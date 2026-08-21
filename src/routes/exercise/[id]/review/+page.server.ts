@@ -108,7 +108,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 export const actions = {
 	answerExercise: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
-		if (!signedInUser) return redirect(302, '/login');
+		if (!signedInUser) return redirect(303, '/login');
 
 		const formData = await request.formData();
 		const formDataSchema = z.object({
@@ -132,7 +132,7 @@ export const actions = {
 		).at(0);
 
 		if (!userProfile) {
-			return redirect(302, '/login');
+			return redirect(303, '/login');
 		}
 
 		const userSrsProfile = (
@@ -143,7 +143,7 @@ export const actions = {
 				.limit(1)
 		).at(0);
 
-		if (!userSrsProfile) return redirect(302, '/exercise');
+		if (!userSrsProfile) return redirect(303, '/exercise');
 
 		const exercise = (
 			await db
@@ -166,7 +166,7 @@ export const actions = {
 				.limit(1)
 		).at(0);
 
-		if (!exercise) return redirect(302, '/exercise');
+		if (!exercise) return redirect(303, '/exercise');
 
 		const reviewDate = new Date();
 
@@ -306,7 +306,7 @@ export const actions = {
 		);
 
 		if (nextUnratedExercise) {
-			return redirect(302, `/exercise/${nextUnratedExercise.id}`);
+			return redirect(303, `/exercise/${nextUnratedExercise.id}`);
 		}
 
 		const nextPendingExercise = (
@@ -318,7 +318,7 @@ export const actions = {
 		).at(0);
 
 		if (nextPendingExercise) {
-			return redirect(302, `/exercise/${nextPendingExercise.id}`);
+			return redirect(303, `/exercise/${nextPendingExercise.id}`);
 		}
 
 		const nextNewExercise = (
@@ -328,9 +328,9 @@ export const actions = {
 		).at(0);
 
 		if (nextNewExercise) {
-			return redirect(302, `/exercise/${nextNewExercise.id}`);
+			return redirect(303, `/exercise/${nextNewExercise.id}`);
 		}
 
-		return redirect(302, '/exercise');
+		return redirect(303, '/exercise');
 	}
 } satisfies Actions;

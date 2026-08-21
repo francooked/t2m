@@ -166,7 +166,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 export const actions = {
 	replyAndCorrect: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
-		if (!signedInUser) return redirect(302, '/chat');
+		if (!signedInUser) return redirect(303, '/chat');
 
 		const formData = await request.formData();
 		const zodSchema = z.object({
@@ -231,7 +231,7 @@ export const actions = {
 	},
 	retryReply: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
-		if (!signedInUser) return redirect(302, '/chat');
+		if (!signedInUser) return redirect(303, '/chat');
 
 		const formData = await request.formData();
 		const zodSchema = z.object({ chatId: z.number().positive(), messageId: z.number().positive() });
@@ -260,7 +260,7 @@ export const actions = {
 	},
 	retryCorrection: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
-		if (!signedInUser) return redirect(302, '/chat');
+		if (!signedInUser) return redirect(303, '/chat');
 
 		const formData = await request.formData();
 		const zodSchema = z.object({ chatId: z.number().positive(), messageId: z.number().positive() });

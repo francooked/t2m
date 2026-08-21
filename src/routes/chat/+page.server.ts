@@ -50,7 +50,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 export const actions = {
 	startChat: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
-		if (!signedInUser) return redirect(302, '/login');
+		if (!signedInUser) return redirect(303, '/login');
 
 		const userProfile = (
 			await db
@@ -60,7 +60,7 @@ export const actions = {
 				.limit(1)
 		).at(0);
 
-		if (!userProfile) return redirect(302, '/login');
+		if (!userProfile) return redirect(303, '/login');
 
 		const formData = await request.formData();
 		const zodSchema = z.object({
@@ -133,7 +133,7 @@ export const actions = {
 	},
 	deleteChat: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
-		if (!signedInUser) return redirect(302, '/login');
+		if (!signedInUser) return redirect(303, '/login');
 
 		const formData = await request.formData();
 		const zodSchema = z.object({ chatId: z.number().positive() });

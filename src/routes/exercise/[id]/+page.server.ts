@@ -154,7 +154,7 @@ export const actions = {
 			}))
 			.at(0);
 
-		if (!exercise) return redirect(302, '/exercise');
+		if (!exercise) return redirect(303, '/exercise');
 
 		const existingExerciseCheck = (
 			await db
@@ -171,7 +171,7 @@ export const actions = {
 				.limit(1)
 		).at(0);
 
-		if (existingExerciseCheck) return redirect(302, `/exercise/${exercise.id}/review`);
+		if (existingExerciseCheck) return redirect(303, `/exercise/${exercise.id}/review`);
 
 		if (exercise.type === 'full_answer' && exercise.version === 1) {
 			const differences = diffArrays(
