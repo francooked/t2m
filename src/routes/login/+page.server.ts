@@ -63,6 +63,7 @@ export const actions = {
 					.values({ userId: user.id, algorithm: 'fsrs', setup: fsrsParameters });
 			});
 		} catch (error) {
+			console.error(error);
 			if (error instanceof APIError) {
 				return signUpResponders.fail({ error: { code: 'signup_failed' }, status: 400 });
 			}
@@ -89,6 +90,7 @@ export const actions = {
 		try {
 			await auth.api.signInEmail({ body: { ...formDataParse.data } });
 		} catch (error) {
+			console.error(error);
 			if (error instanceof APIError) {
 				return signInResponders.fail({ error: { code: 'signin_failed' }, status: 400 });
 			}

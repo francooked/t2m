@@ -7,7 +7,7 @@ import type { Actions } from './$types';
 import z from 'zod';
 import { LANGUAGE_CODES } from '$lib/constants';
 import { requireUserSession } from '$lib/server/session-user';
-import { ChatTurnError, processChatTurn } from '$lib/server/chat-turn';
+import { processChatTurn } from '$lib/server/chat-turn';
 import { normalizeText } from '$lib/correction/normalize-text';
 import { createFormResponders } from '$lib/forms/result.server';
 import { START_CHAT_ID, startChatFailure, startChatSuccess } from '$lib/forms/start-chat';
@@ -123,9 +123,7 @@ export const actions = {
 				assistantMessageId: newAssistantMessage.id
 			});
 		} catch (error) {
-			if (error instanceof ChatTurnError) {
-				return startChatResponders.fail({ error: { code: 'chat_turn_error' }, status: 400 });
-			}
+			console.error(error);
 			return startChatResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
 

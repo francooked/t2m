@@ -5,7 +5,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { redirect } from '@sveltejs/kit';
 import z from 'zod';
 import { requireUserSession } from '$lib/server/session-user';
-import { ChatTurnError, processChatTurn, retryCorrection, retryReply } from '$lib/server/chat-turn';
+import { processChatTurn, retryCorrection, retryReply } from '$lib/server/chat-turn';
 import { normalizeText } from '$lib/correction/normalize-text';
 import { buildBlame } from '$lib/correction/build-blame';
 import { traceRewriteHistory, type Segment } from '$lib/correction/segments';
@@ -207,10 +207,7 @@ export const actions = {
 		const newAssistantMessage = newMessages.at(1);
 
 		if (!newUserMessage || !newAssistantMessage) {
-			return replyAndCorrectResponders.fail({
-				error: { code: 'failed_to_create_messages' },
-				status: 500
-			});
+			throw new Error('Failed to create messages');
 		}
 
 		try {
@@ -221,9 +218,7 @@ export const actions = {
 				assistantMessageId: newAssistantMessage.id
 			});
 		} catch (error) {
-			if (error instanceof ChatTurnError) {
-				return replyAndCorrectResponders.fail({ error: { code: 'chat_turn_error' }, status: 400 });
-			}
+			console.error(error);
 			return replyAndCorrectResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
 
@@ -250,9 +245,7 @@ export const actions = {
 				assistantMessageId: data.messageId
 			});
 		} catch (error) {
-			if (error instanceof ChatTurnError) {
-				return retryReplyResponders.fail({ error: { code: 'chat_turn_error' }, status: 400 });
-			}
+			console.error(error);
 			return retryReplyResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
 
@@ -283,9 +276,7 @@ export const actions = {
 				userMessageId: data.messageId
 			});
 		} catch (error) {
-			if (error instanceof ChatTurnError) {
-				return retryCorrectionResponders.fail({ error: { code: 'chat_turn_error' }, status: 400 });
-			}
+			console.error(error);
 			return retryCorrectionResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
 

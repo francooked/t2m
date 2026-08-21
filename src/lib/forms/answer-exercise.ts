@@ -8,11 +8,6 @@ export const answerExerciseSuccess = defineSuccess(z.null());
 
 export const answerExerciseFailure = defineFailure(
 	z.object({
-		code: z.enum([
-			'invalid_input',
-			'invalid_fsrs_parameters',
-			'unexpected',
-			'invalid_srs_algorithm'
-		])
+		code: z.enum(['invalid_input'])
 	})
 );

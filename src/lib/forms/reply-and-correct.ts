@@ -7,12 +7,6 @@ export const replyAndCorrectSuccess = defineSuccess(z.null());
 
 export const replyAndCorrectFailure = defineFailure(
 	z.object({
-		code: z.enum([
-			'invalid_input',
-			'chat_not_found',
-			'failed_to_create_messages',
-			'chat_turn_error',
-			'unexpected'
-		])
+		code: z.enum(['invalid_input', 'chat_not_found', 'unexpected'])
 	})
 );

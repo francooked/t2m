@@ -2,8 +2,6 @@ import * as schema from '$lib/server/db/schema';
 import * as z from 'zod';
 import { db } from '$lib/server/db';
 import { eq, and, inArray } from 'drizzle-orm';
-import Groq from 'groq-sdk';
-import { GROQ_API_KEY } from '$env/static/private';
 import {
 	buildPrompt as buildMessageReplyPrompt,
 	outputSchema as messageReplyOutputSchema
@@ -13,25 +11,12 @@ import {
 	outputSchema as messageCorrectionOutputSchema
 } from '$lib/prompts/message-correction';
 import { retry } from './retry';
+import { groq, parseLlmResponse } from './groq';
 
-const groqClient = new Groq({ apiKey: GROQ_API_KEY });
-
+/** Operational chat-turn failure. `code` is for logs; actions map any throw to `unexpected`. */
 export class ChatTurnError extends Error {
-	constructor(
-		public code: 'chat_not_found' | 'messages_not_found' | 'llm_invalid_response' | 'persist_failed'
-	) {
+	constructor(public code: 'chat_not_found' | 'messages_not_found' | 'persist_failed') {
 		super(code);
-	}
-}
-
-async function parseLlmResponse<T extends z.ZodType>(content: any, schema: T) {
-	try {
-		const json = JSON.parse(content);
-		const parsed = schema.parse(json);
-		return parsed;
-	} catch {
-		console.error('invalid llm response:', content);
-		throw new ChatTurnError('llm_invalid_response');
 	}
 }
 
@@ -144,7 +129,7 @@ async function replyUserMessage({
 
 	const llmResponse = await retry({
 		fn: async () => {
-			const chatCompletion = await groqClient.chat.completions.create({
+			const chatCompletion = await groq.chat.completions.create({
 				messages: buildMessageReplyPrompt({
 					nativeLanguage: chat.nativeLanguage,
 					targetLanguage: chat.targetLanguage,
@@ -209,7 +194,7 @@ async function correctUserMessage({
 
 	const llmResponse = await retry({
 		fn: async () => {
-			const chatCompletion = await groqClient.chat.completions.create({
+			const chatCompletion = await groq.chat.completions.create({
 				messages: buildMessageCorrectionPrompt({
 					nativeLanguage: chat.nativeLanguage,
 					targetLanguage: chat.targetLanguage,
@@ -310,6 +295,7 @@ async function runMessageTask({
 	} catch (error) {
 		console.error('chat task failed:', error);
 		await updateMessageStatus({ chatId, messageId, status: 'failed' });
+		throw error;
 	}
 }
 
@@ -325,7 +311,7 @@ export async function processChatTurn({
 	assistantMessageId: number;
 }) {
 	const { chat, messages } = await loadChat({ userId, chatId });
-	await Promise.all([
+	await Promise.allSettled([
 		runMessageTask({
 			chatId,
 			messageId: assistantMessageId,
@@ -395,6 +381,11 @@ export async function retryCorrection({
 		chatId,
 		messageId: userMessageId,
 		task: () =>
-			correctUserMessage({ chat, messages, userMessageId, assistantMessageId: assistantMessage.id })
+			correctUserMessage({
+				chat,
+				messages,
+				userMessageId,
+				assistantMessageId: assistantMessage.id
+			})
 	});
 }

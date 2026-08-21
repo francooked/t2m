@@ -5,16 +5,14 @@ import * as schema from '$lib/server/db/schema';
 import { db } from '$lib/server/db';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import z from 'zod';
-import Groq from 'groq-sdk';
-import { GROQ_API_KEY } from '$env/static/private';
 import { buildPrompt, outputSchema } from '$lib/prompts/translation-feedback';
 import { tokenize } from '$lib/correction/tokenize';
 import { diffArrays } from 'diff';
-import { ChatTurnError } from '$lib/server/chat-turn';
 import { retry } from '$lib/server/retry';
 import { createFormResponders } from '$lib/forms/result.server';
 import { CHECK_ANSWER_ID, checkAnswerFailure, checkAnswerSuccess } from '$lib/forms/check-answer';
 import { parseExercisePayload, toPublicExercisePayload } from '$lib/exercise/parse-exercise';
+import { groq, parseLlmResponse } from '$lib/server/groq';
 
 const checkAnswer = createFormResponders({
 	id: CHECK_ANSWER_ID,
@@ -41,17 +39,6 @@ async function persistUnratedCheck({
 	if (!exerciseCheck) throw new Error('Failed to persist exercise check');
 
 	return exerciseCheck;
-}
-
-async function parseLlmResponse<T extends z.ZodType>(content: any, schema: T) {
-	try {
-		const json = JSON.parse(content);
-		const parsed = schema.parse(json);
-		return parsed;
-	} catch {
-		console.error('invalid llm response:', content);
-		throw new ChatTurnError('llm_invalid_response');
-	}
 }
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -188,12 +175,10 @@ export const actions = {
 				return redirect(303, `/exercise/${exercise.id}/review`);
 			}
 
-			const groqClient = new Groq({ apiKey: GROQ_API_KEY });
-
 			try {
 				const llmResponse = await retry({
 					fn: async () => {
-						const chatCompletion = await groqClient.chat.completions.create({
+						const chatCompletion = await groq.chat.completions.create({
 							messages: buildPrompt({
 								original: exercise.payload.extra,
 								expected: exercise.payload.back,
@@ -225,17 +210,11 @@ export const actions = {
 					payload: { answer: formDataParse.data.answer, tips: llmResponse.tips }
 				});
 			} catch (error) {
-				console.log(error);
-				if (error instanceof ChatTurnError) {
-					return checkAnswer.fail({ error: { code: 'chat_turn_error' }, status: 400 });
-				}
+				console.error(error);
 				return checkAnswer.fail({ error: { code: 'unexpected' }, status: 500 });
 			}
 		} else {
-			return checkAnswer.fail({
-				error: { code: 'invalid_exercise_type_or_version' },
-				status: 400
-			});
+			throw new Error('Undefined exercise type or version');
 		}
 
 		return redirect(303, `/exercise/${exercise.id}/review`);

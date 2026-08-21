@@ -20,6 +20,7 @@ export const actions = {
 		try {
 			await auth.api.signOut({ headers });
 		} catch (error) {
+			console.error(error);
 			if (error instanceof APIError) {
 				return signOutResponders.fail({ error: { code: 'signout_failed' }, status: 400 });
 			}

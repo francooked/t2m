@@ -19,7 +19,7 @@
 {#if data.exercise.type === 'full_answer' && data.exercise.version === 1}
 	<form method="post" action="?/checkAnswer" use:enhance={checkAnswer.enhance}>
 		{#if checkAnswer.view.status === 'failure'}
-			<p>Error al responder: {checkAnswer.view.error.code}</p>
+			<p>Error al responder</p>
 		{/if}
 		<p>{data.exercise.payload.extra}</p>
 		<label for={`answer_${data.exercise.id}`}>Respuesta:</label>

@@ -195,7 +195,7 @@ export const actions = {
 
 			const fsrsParametersParse = fsrsParametersSchema.safeParse(userSrsProfile.setup);
 			if (!fsrsParametersParse.success) {
-				return answerExercise.fail({ error: { code: 'invalid_fsrs_parameters' }, status: 400 });
+				throw new Error('Invalid FSRS parameters');
 			}
 
 			const existingFsrsCard = (
@@ -300,7 +300,7 @@ export const actions = {
 				}
 			});
 		} else {
-			return answerExercise.fail({ error: { code: 'invalid_srs_algorithm' }, status: 400 });
+			throw new Error('Invalid SRS algorithm');
 		}
 
 		const nextUnratedExercise = (await resolveNextUnratedExercises({ userId: signedInUser.id })).at(
