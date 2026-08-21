@@ -1,0 +1,1 @@
+ALTER TABLE "message_rewrite" ALTER COLUMN "message_id" SET NOT NULL;

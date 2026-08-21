@@ -88,7 +88,9 @@ export const messageRewrite = pgTable(
 	'message_rewrite',
 	{
 		id: serial('id').primaryKey(),
-		messageId: integer('message_id').references(() => message.id, { onDelete: 'cascade' }),
+		messageId: integer('message_id')
+			.references(() => message.id, { onDelete: 'cascade' })
+			.notNull(),
 		text: text('text').notNull(),
 		index: integer('index').notNull(),
 		reason: text('reason').notNull(),
