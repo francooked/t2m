@@ -1,33 +1,32 @@
 ---
-description: Convención de errores del MVP — cuándo tirar, cuándo capturar, qué código va al form
+description: Convención de errores — tirar, capturar y qué código llega al form
 alwaysApply: true
 ---
 
 # Manejo de errores
 
-Dos capas. No mezclarlas.
+Tira si no puedes cumplir. Clase solo si vas a leer un campo. En el dominio, captura solo para anotar estado y relanza. En el action, captura lo operacional y `fail()`: código específico solo si el usuario actúa distinto; si no, `unexpected`.
 
-## 1. Dominio (`src/lib/server`)
+Recuperable vs irrecuperable **no decide el throw**. Decide **quién captura**.
 
-Tira y listo. No conviertas a `fail()`.
+## 1. ¿Tiro?
 
-- **Error de dominio** (clase propia) si la operación puede fallar en producción y quieres datos para el log (`code`, `reason`, `content`).
-- **`throw new Error(...)`** si es un invariante / bug (“esto no debería pasar”).
-- Si capturas en el dominio, es solo para un efecto (ej. marcar el mensaje `failed`) y **siempre relanzas**.
+Si la función no puede cumplir lo que promete, tira. Siempre. El dominio no llama a `fail()`.
 
-Los códigos del dominio son para el log. Nunca se reenvían al form.
+- `throw new Error('…')` — invariante / bug (“el insert no devolvió fila”).
+- Clase propia (`ChatTurnError`, `LlmInvalidResponseError`) — fallo operacional de un módulo (LLM, chat ausente).
 
-## 2. Action (`+page.server.ts`)
+## 2. ¿`Error` o clase propia?
 
-El form solo recibe códigos que el **usuario puede usar**:
+Sentry o `console.error` se comen **cualquier** throw. La stack ya es metadata. No hagas una clase “por si quiero datos”.
 
-| Código | Cuándo |
-|---|---|
-| `invalid_input` | Zod rechazó el form |
-| uno específico (`signin_failed`, `chat_not_found`, …) | El usuario puede corregir o el estado es esperable |
-| `unexpected` | Cualquier throw del dominio o de una lib |
+Clase propia solo si **tu código** va a leer un campo (`reason`, `content`, `code`). Si hoy no mirarías esa propiedad, no la crees. Observabilidad (Sentry) es ortogonal: le llega el throw igual.
 
-Plantilla:
+## 3. ¿Capturo? Dos sitios, dos motivos
+
+**Dominio** — efecto de **datos**, no de UI. Anotas estado (ej. mensaje `failed`) y **relanzas**. La UI se entera leyendo ese estado, no por el catch.
+
+**Action** — evitas la error page de SvelteKit. **No relanzas.** Traduces a `fail()`:
 
 ```ts
 if (!parsed.success) {
@@ -42,14 +41,33 @@ try {
 }
 ```
 
-- **No** hagas `instanceof ChatTurnError` / `LlmInvalidResponseError` para mapear su `code` al form.
-- **Sí** hagas `instanceof` de una lib externa solo si el usuario puede actuar (ej. `APIError` de better-auth → `signin_failed`, status 400).
-- Status: **400** si es esperado; **500** si es `unexpected`.
-- El schema de failure lista **solo** los códigos que el action realmente devuelve.
-- Los `load` pueden tirar: SvelteKit muestra la error page. `createFormView` ya trata `result.type === 'error'` como `unexpected`.
+- `load` → no captures. Que Svelte muestre la error page. `createFormView` ya trata `result.type === 'error'` como `unexpected`.
+- Action, trabajo operacional (LLM, auth) → captura y `fail`.
+- Invariante que encontraste a propósito → tira; no le inventes un código de form.
+
+## 4. ¿Qué código va al form?
+
+No preguntes “¿es grave?”. Pregunta: **si muestro el código A en vez del B, ¿el usuario hace algo distinto?**
+
+| Sí | Código | Status |
+|---|---|---|
+| Cambia el input | `invalid_input` | 400 |
+| Corrige mail/clave (`APIError`) | `signin_failed` | 400 |
+| El chat ya no existe | `chat_not_found` | 400 |
+
+| No | Código | Status |
+|---|---|---|
+| JSON malo, persist falló, timeout | `unexpected` | 500 |
+
+`persist_failed` es grave para ti; para el usuario es el mismo reintento. Por eso no viaja al form.
+
+- El schema de failure lista **solo** los códigos que ese action realmente devuelve.
+- `instanceof` de dominio (`ChatTurnError`, …) **no** se usa para mapear al form.
+- `instanceof` de lib externa **sí**, solo si el usuario puede actuar (`APIError` → `signin_failed`).
+- Un código nuevo nace cuando la UI **ramifica**. No antes.
 
 ## Qué no hacer
 
-- No pases el código crudo del dominio al form (`persist_failed`, `invalid_json`, …).
-- No inventes un código por cada clase (`chat_turn_error`). Es el peor de los dos mundos: acoplas y el usuario no ve nada distinto.
+- No pases el código crudo del dominio (`persist_failed`, `invalid_json`, …).
+- No inventes un código por cada clase (`chat_turn_error`).
 - No agregues un `AppError` global. Con estas dos capas basta.
