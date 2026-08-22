@@ -10,14 +10,14 @@ import { tokenize } from '$lib/correction/tokenize';
 import { diffArrays } from 'diff';
 import { retry } from '$lib/server/retry';
 import { createFormResponders } from '$lib/forms/result.server';
-import { CHECK_ANSWER_ID, checkAnswerFailure, checkAnswerSuccess } from '$lib/forms/check-answer';
+import { ANSWER_ID, answerFailure, answerSuccess } from '$lib/forms/answer';
 import { parseExercisePayload, toPublicExercisePayload } from '$lib/exercise/parse-exercise';
 import { groq, parseLlmResponse } from '$lib/server/groq';
 
-const checkAnswer = createFormResponders({
-	id: CHECK_ANSWER_ID,
-	success: checkAnswerSuccess,
-	failure: checkAnswerFailure
+const answer = createFormResponders({
+	id: ANSWER_ID,
+	success: answerSuccess,
+	failure: answerFailure
 });
 
 async function persistUnratedCheck({
@@ -70,7 +70,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		}))
 		.at(0);
 
-	if (!exercise) return redirect(302, '/exercise');
+	if (!exercise) return redirect(302, '/exercises');
 
 	const exerciseCheck = (
 		await db
@@ -87,14 +87,13 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			.limit(1)
 	).at(0);
 
-	if (exerciseCheck) return redirect(302, `/exercise/${exerciseId}/review`);
+	if (exerciseCheck) return redirect(302, `/exercises/${exerciseId}/rate`);
 
 	return { exercise };
 };
 
 export const actions = {
-	// A better name for this action would be `review`.
-	checkAnswer: async ({ request, locals }) => {
+	answer: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
 		if (!signedInUser) return redirect(302, '/login');
 
@@ -109,7 +108,7 @@ export const actions = {
 		});
 
 		if (!formDataParse.success) {
-			return checkAnswer.fail({ error: { code: 'invalid_input' }, status: 400 });
+			return answer.fail({ error: { code: 'invalid_input' }, status: 400 });
 		}
 
 		const exercise = (
@@ -141,7 +140,7 @@ export const actions = {
 			}))
 			.at(0);
 
-		if (!exercise) return redirect(303, '/exercise');
+		if (!exercise) return redirect(303, '/exercises');
 
 		const existingExerciseCheck = (
 			await db
@@ -158,7 +157,7 @@ export const actions = {
 				.limit(1)
 		).at(0);
 
-		if (existingExerciseCheck) return redirect(303, `/exercise/${exercise.id}/review`);
+		if (existingExerciseCheck) return redirect(303, `/exercises/${exercise.id}/rate`);
 
 		if (exercise.type === 'full_answer' && exercise.version === 1) {
 			const differences = diffArrays(
@@ -172,7 +171,7 @@ export const actions = {
 					payload: { answer: formDataParse.data.answer, tips: [] }
 				});
 
-				return redirect(303, `/exercise/${exercise.id}/review`);
+				return redirect(303, `/exercises/${exercise.id}/rate`);
 			}
 
 			try {
@@ -211,12 +210,12 @@ export const actions = {
 				});
 			} catch (error) {
 				console.error(error);
-				return checkAnswer.fail({ error: { code: 'unexpected' }, status: 500 });
+				return answer.fail({ error: { code: 'unexpected' }, status: 500 });
 			}
 		} else {
 			throw new Error('Undefined exercise type or version');
 		}
 
-		return redirect(303, `/exercise/${exercise.id}/review`);
+		return redirect(303, `/exercises/${exercise.id}/rate`);
 	}
 } satisfies Actions;

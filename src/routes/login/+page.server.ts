@@ -24,7 +24,7 @@ const signInResponders = createFormResponders({
 });
 
 export const load: PageServerLoad = async ({ locals }) => {
-	if (locals.user) return redirect(302, '/chat');
+	if (locals.user) return redirect(302, '/chats');
 };
 
 export const actions = {
@@ -70,7 +70,7 @@ export const actions = {
 			return signUpResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
 
-		return redirect(303, '/chat');
+		return redirect(303, '/chats');
 	},
 	signInEmail: async ({ request }) => {
 		const formDataSchema = z.object({
@@ -97,6 +97,6 @@ export const actions = {
 			return signInResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
 
-		return redirect(303, '/chat');
+		return redirect(303, '/chats');
 	}
 } satisfies Actions;

@@ -30,7 +30,7 @@
 	{/if}
 	{#each data.chats as chat (chat.id)}
 		<div>
-			<a href={`/chat/${chat.id}`} class="font-medium">{chat.title}</a>
+			<a href={`/chats/${chat.id}`} class="font-medium">{chat.title}</a>
 			<form method="post" action="?/deleteChat" class="inline" use:enhance={deleteChat.enhance}>
 				<button type="submit" class="font-medium" disabled={deleteChat.view.status === 'pending'}
 					>{deleteChat.view.status === 'pending' ? 'Cargando' : 'Eliminar'}</button

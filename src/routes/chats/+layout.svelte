@@ -26,8 +26,8 @@
 </form>
 
 <div>
-	<a href="/chat" class="font-medium">Chats</a>
-	<a href="/exercise" class="font-medium">Ejercicios</a>
+	<a href="/chats" class="font-medium">Chats</a>
+	<a href="/exercises" class="font-medium">Ejercicios</a>
 </div>
 
 {@render children?.()}

@@ -10,11 +10,7 @@ import { diffArrays } from 'diff';
 import { tokenize } from '$lib/correction/tokenize';
 import { parseExerciseCheckPayload } from '$lib/exercise/parse-exercise-check';
 import { createFormResponders } from '$lib/forms/result.server';
-import {
-	ANSWER_EXERCISE_ID,
-	answerExerciseFailure,
-	answerExerciseSuccess
-} from '$lib/forms/answer-exercise';
+import { RATE_ID, rateFailure, rateSuccess } from '$lib/forms/rate';
 import * as z from 'zod';
 import { createEmptyCard, fsrs, Rating, type StepUnit, TypeConvert } from 'ts-fsrs';
 import {
@@ -23,10 +19,10 @@ import {
 	resolveNextUnratedExercises
 } from '$lib/server/exercise/next-exercise';
 
-const answerExercise = createFormResponders({
-	id: ANSWER_EXERCISE_ID,
-	success: answerExerciseSuccess,
-	failure: answerExerciseFailure
+const rate = createFormResponders({
+	id: RATE_ID,
+	success: rateSuccess,
+	failure: rateFailure
 });
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -62,7 +58,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		}))
 		.at(0);
 
-	if (!exercise) return redirect(302, '/exercise');
+	if (!exercise) return redirect(302, '/exercises');
 
 	const exerciseCheck = (
 		await db
@@ -82,7 +78,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		}))
 		.at(0);
 
-	if (!exerciseCheck) return redirect(302, `/exercise/${exerciseId}`);
+	if (!exerciseCheck) return redirect(302, `/exercises/${exerciseId}`);
 
 	if (exercise.type === 'full_answer' && exercise.version === 1) {
 		const differences = diffArrays(
@@ -102,11 +98,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		};
 	}
 
-	return redirect(302, `/exercise/${exerciseId}`);
+	return redirect(302, `/exercises/${exerciseId}`);
 };
 
 export const actions = {
-	answerExercise: async ({ request, locals }) => {
+	rate: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
 		if (!signedInUser) return redirect(303, '/login');
 
@@ -121,7 +117,7 @@ export const actions = {
 		});
 
 		if (!formDataParse.success) {
-			return answerExercise.fail({ error: { code: 'invalid_input' }, status: 400 });
+			return rate.fail({ error: { code: 'invalid_input' }, status: 400 });
 		}
 
 		const userProfile = (
@@ -143,7 +139,7 @@ export const actions = {
 				.limit(1)
 		).at(0);
 
-		if (!userSrsProfile) return redirect(303, '/exercise');
+		if (!userSrsProfile) return redirect(303, '/exercises');
 
 		const exercise = (
 			await db
@@ -166,7 +162,7 @@ export const actions = {
 				.limit(1)
 		).at(0);
 
-		if (!exercise) return redirect(303, '/exercise');
+		if (!exercise) return redirect(303, '/exercises');
 
 		const reviewDate = new Date();
 
@@ -308,7 +304,7 @@ export const actions = {
 		);
 
 		if (nextUnratedExercise) {
-			return redirect(303, `/exercise/${nextUnratedExercise.id}`);
+			return redirect(303, `/exercises/${nextUnratedExercise.id}`);
 		}
 
 		const nextPendingExercise = (
@@ -320,7 +316,7 @@ export const actions = {
 		).at(0);
 
 		if (nextPendingExercise) {
-			return redirect(303, `/exercise/${nextPendingExercise.id}`);
+			return redirect(303, `/exercises/${nextPendingExercise.id}`);
 		}
 
 		const nextNewExercise = (
@@ -330,9 +326,9 @@ export const actions = {
 		).at(0);
 
 		if (nextNewExercise) {
-			return redirect(303, `/exercise/${nextNewExercise.id}`);
+			return redirect(303, `/exercises/${nextNewExercise.id}`);
 		}
 
-		return redirect(303, '/exercise');
+		return redirect(303, '/exercises');
 	}
 } satisfies Actions;

@@ -127,7 +127,7 @@ export const actions = {
 			return startChatResponders.fail({ error: { code: 'unexpected' }, status: 500 });
 		}
 
-		return redirect(303, `/chat/${newChat.id}`);
+		return redirect(303, `/chats/${newChat.id}`);
 	},
 	deleteChat: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);

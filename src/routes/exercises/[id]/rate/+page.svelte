@@ -1,19 +1,15 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import {
-		ANSWER_EXERCISE_ID,
-		answerExerciseFailure,
-		answerExerciseSuccess
-	} from '$lib/forms/answer-exercise';
+	import { RATE_ID, rateFailure, rateSuccess } from '$lib/forms/rate';
 	import { createFormView } from '$lib/forms/create-form-view.svelte';
 	import type { PageProps } from './$types';
 
 	let { data, form, params }: PageProps = $props();
 
-	let answerExercise = createFormView({
-		id: ANSWER_EXERCISE_ID,
-		success: answerExerciseSuccess,
-		failure: answerExerciseFailure,
+	let rate = createFormView({
+		id: RATE_ID,
+		success: rateSuccess,
+		failure: rateFailure,
 		getForm: () => form
 	});
 </script>
@@ -37,8 +33,8 @@
 	</ul>
 {/if}
 
-<form method="post" action="?/answerExercise" use:enhance={answerExercise.enhance}>
-	{#if answerExercise.view.status === 'failure'}
+<form method="post" action="?/rate" use:enhance={rate.enhance}>
+	{#if rate.view.status === 'failure'}
 		<p>Error al enviar</p>
 	{/if}
 	<select name="rating">
@@ -48,7 +44,7 @@
 		<option value="easy">Easy</option>
 	</select>
 	<input type="hidden" name="exercise_id" value={params.id} />
-	<button type="submit" disabled={answerExercise.view.status === 'pending'}
-		>{answerExercise.view.status === 'pending' ? 'Cargando' : 'Enviar'}</button
+	<button type="submit" disabled={rate.view.status === 'pending'}
+		>{rate.view.status === 'pending' ? 'Cargando' : 'Enviar'}</button
 	>
 </form>

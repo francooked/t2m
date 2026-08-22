@@ -46,7 +46,7 @@
 </ul>
 
 {#if data.nextExercise}
-	<a href={`/exercise/${data.nextExercise.id}`}>Repasar</a>
+	<a href={`/exercises/${data.nextExercise.id}`}>Repasar</a>
 {:else}
 	Estás al día
 {/if}
