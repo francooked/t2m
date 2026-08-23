@@ -95,7 +95,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 export const actions = {
 	answer: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
-		if (!signedInUser) return redirect(302, '/login');
+		if (!signedInUser) return redirect(303, '/login');
 
 		const formData = await request.formData();
 		const formDataSchema = z.object({
