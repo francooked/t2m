@@ -22,6 +22,7 @@ import {
 } from '$lib/constants';
 import type { ExercisePayload } from '$lib/exercise/exercise-payload';
 import type { ExerciseCheckPayload } from '$lib/exercise/exercise-check-payload';
+import type { FeedbackPayloadSchema } from '$lib/feedback/feedback-payload';
 
 export const languageCodeEnum = pgEnum('language_code', LANGUAGE_CODES);
 export const messageRoleEnum = pgEnum('message_role', ROLES);
@@ -153,3 +154,12 @@ export const exerciseMessageRewrite = pgTable(
 	},
 	(table) => [primaryKey({ columns: [table.exerciseId, table.messageRewriteId] })]
 );
+
+export const feedback = pgTable('feedback', {
+	id: serial('id').primaryKey(),
+	userId: text('user_id')
+		.references(() => user.id, { onDelete: 'cascade' })
+		.notNull(),
+	createdAt: timestamp('created_at').defaultNow().notNull(),
+	payload: jsonb('payload').$type<FeedbackPayloadSchema>().notNull()
+});
