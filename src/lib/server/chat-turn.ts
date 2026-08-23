@@ -260,10 +260,8 @@ async function correctUserMessage({
 				.values({
 					userId: chat.userId,
 					targetLanguage: chat.targetLanguage,
-					type: 'full_answer',
-					version: 1,
 					source: { messageRewriteId: lastMessageRewrite.id },
-					payload: { front, back, extra }
+					payload: { type: 'full_answer', version: 1, payload: { front, back, extra } }
 				})
 				.returning({ id: schema.exercise.id })
 		).at(0);

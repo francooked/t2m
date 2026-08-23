@@ -12,14 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { isNull } from 'drizzle-orm';
 import { user } from './auth.schema';
-import {
-	EXERCISE_TYPES,
-	LANGUAGE_CODES,
-	MESSAGE_STATUS,
-	ROLES,
-	SRS_ALGORITHMS,
-	TIME_ZONES
-} from '$lib/constants';
+import { LANGUAGE_CODES, MESSAGE_STATUS, ROLES, SRS_ALGORITHMS, TIME_ZONES } from '$lib/constants';
 import type { ExercisePayload } from '$lib/exercise/exercise-payload';
 import type { ExerciseCheckPayload } from '$lib/exercise/exercise-check-payload';
 import type { FeedbackPayloadSchema } from '$lib/feedback/feedback-payload';
@@ -27,7 +20,6 @@ import type { FeedbackPayloadSchema } from '$lib/feedback/feedback-payload';
 export const languageCodeEnum = pgEnum('language_code', LANGUAGE_CODES);
 export const messageRoleEnum = pgEnum('message_role', ROLES);
 export const messageStatusEnum = pgEnum('message_status', MESSAGE_STATUS);
-export const exerciseTypeEnum = pgEnum('exercise_type', EXERCISE_TYPES);
 export const srsAlgorithmEnum = pgEnum('srs_algorithm', SRS_ALGORITHMS);
 export const timeZoneEnum = pgEnum('time_zone', TIME_ZONES);
 
@@ -108,8 +100,6 @@ export const exercise = pgTable(
 			.references(() => user.id, { onDelete: 'cascade' })
 			.notNull(),
 		targetLanguage: languageCodeEnum('target_language').notNull(),
-		type: exerciseTypeEnum('type').notNull(),
-		version: integer('version').notNull(),
 		source: jsonb('source').$type<{ messageRewriteId: number }>().notNull(),
 		payload: jsonb('payload').$type<ExercisePayload>().notNull(),
 		createdAt: timestamp('created_at').defaultNow().notNull(),

@@ -51,8 +51,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		await db
 			.select({
 				id: schema.exercise.id,
-				type: schema.exercise.type,
-				version: schema.exercise.version,
 				payload: schema.exercise.payload
 			})
 			.from(schema.exercise)
@@ -64,9 +62,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				)
 			)
 	)
-		.map(({ id, ...rest }) => ({
+		.map(({ id, payload }) => ({
 			id,
-			...toPublicExercisePayload(parseExercisePayload(rest))
+			...toPublicExercisePayload(parseExercisePayload(payload))
 		}))
 		.at(0);
 
@@ -115,8 +113,6 @@ export const actions = {
 			await db
 				.select({
 					id: schema.exercise.id,
-					type: schema.exercise.type,
-					version: schema.exercise.version,
 					payload: schema.exercise.payload,
 					targetLanguage: schema.exercise.targetLanguage,
 					nativeLanguage: schema.userProfile.nativeLanguage
@@ -132,11 +128,11 @@ export const actions = {
 				)
 				.limit(1)
 		)
-			.map(({ id, targetLanguage, nativeLanguage, ...rest }) => ({
+			.map(({ id, targetLanguage, nativeLanguage, payload }) => ({
 				id,
 				targetLanguage,
 				nativeLanguage,
-				...parseExercisePayload(rest)
+				...parseExercisePayload(payload)
 			}))
 			.at(0);
 

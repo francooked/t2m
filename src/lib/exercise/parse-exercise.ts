@@ -1,10 +1,11 @@
 import { exercisePayloadSchema } from './exercise-payload';
 
-export function parseExercisePayload(row: { type: string; version: number; payload: unknown }) {
-	const parsed = exercisePayloadSchema.parse(row);
-	return parsed;
+/** Validates the exercise jsonb envelope `{ type, version, payload }`. */
+export function parseExercisePayload(payload: unknown) {
+	return exercisePayloadSchema.parse(payload);
 }
 
+/** Strips `back` so the client never sees the expected answer. */
 export function toPublicExercisePayload(payload: ReturnType<typeof parseExercisePayload>) {
 	if (payload.type === 'full_answer') {
 		if (payload.version === 1) {

@@ -14,4 +14,4 @@ export const exercisePayloadSchema = z.discriminatedUnion('type', [
 	])
 ]);
 
-export type ExercisePayload = z.infer<typeof exercisePayloadSchema>['payload'];
+export type ExercisePayload = z.infer<typeof exercisePayloadSchema>;

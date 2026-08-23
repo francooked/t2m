@@ -29,7 +29,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const reviewDate = new Date();
 
 	const unratedExercises = (await resolveNextUnratedExercises({ userId: signedInUser.id })).map(
-		({ id, ...rest }) => ({ id, ...toPublicExercisePayload(parseExercisePayload(rest)) })
+		({ id, payload }) => ({ id, ...toPublicExercisePayload(parseExercisePayload(payload)) })
 	);
 
 	const pendingExercises = (
@@ -38,14 +38,14 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			timeZone: userProfile.timeZone,
 			reviewDate
 		})
-	).map(({ id, ...rest }) => ({ id, ...toPublicExercisePayload(parseExercisePayload(rest)) }));
+	).map(({ id, payload }) => ({ id, ...toPublicExercisePayload(parseExercisePayload(payload)) }));
 
 	// New exercises doesn't have a FSRS card associated.
 	const newExercises = (
 		await resolveNextNewExercises({
 			userId: signedInUser.id
 		})
-	).map(({ id, ...rest }) => ({ id, ...toPublicExercisePayload(parseExercisePayload(rest)) }));
+	).map(({ id, payload }) => ({ id, ...toPublicExercisePayload(parseExercisePayload(payload)) }));
 
 	const nextExercise =
 		unratedExercises.at(0) ?? pendingExercises.at(0) ?? newExercises.at(0) ?? null;

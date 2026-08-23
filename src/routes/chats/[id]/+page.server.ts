@@ -21,7 +21,7 @@ import {
 	retryCorrectionFailure,
 	retryCorrectionSuccess
 } from '$lib/forms/retry-correction';
-import { exercisePayloadSchema } from '$lib/exercise/exercise-payload';
+import { parseExercisePayload } from '$lib/exercise/parse-exercise';
 
 type BaseMessage = {
 	id: number;
@@ -137,8 +137,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		await db
 			.select({
 				id: schema.exercise.id,
-				type: schema.exercise.type,
-				version: schema.exercise.version,
 				payload: schema.exercise.payload
 			})
 			.from(schema.exerciseMessageRewrite)
@@ -151,14 +149,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			.innerJoin(schema.chat, eq(schema.message.chatId, schema.chat.id))
 			.where(eq(schema.chat.id, chat.id))
 			.orderBy(asc(schema.exercise.id))
-	).map((row) => {
-		const payload = exercisePayloadSchema.parse({
-			type: row.type,
-			version: row.version,
-			payload: row.payload
-		});
-		return { id: row.id, ...payload };
-	});
+	).map(({ id, payload }) => ({ id, ...parseExercisePayload(payload) }));
 
 	return { messages, exercises };
 };

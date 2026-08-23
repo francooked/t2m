@@ -14,8 +14,6 @@ export async function resolveNextUnratedExercises({
 	const unratedExercises = await db
 		.select({
 			id: schema.exercise.id,
-			type: schema.exercise.type,
-			version: schema.exercise.version,
 			payload: schema.exercise.payload
 		})
 		.from(schema.exerciseCheck)
@@ -45,8 +43,6 @@ export async function resolveNextPendingExercises({
 	const pendingExercises = await db
 		.select({
 			id: schema.exercise.id,
-			type: schema.exercise.type,
-			version: schema.exercise.version,
 			payload: schema.exercise.payload
 		})
 		.from(fsrsSchema.fsrsCard)
@@ -80,8 +76,6 @@ export async function resolveNextNewExercises({
 	const newExercises = await db
 		.select({
 			id: schema.exercise.id,
-			type: schema.exercise.type,
-			version: schema.exercise.version,
 			payload: schema.exercise.payload
 		})
 		.from(schema.exercise)
