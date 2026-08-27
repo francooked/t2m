@@ -99,6 +99,10 @@
 									>
 										{change.text}
 									</button>
+									<!-- 
+									Add a space after a removed chunk if the next difference also starts with a word/number character,
+									so that deleted tokens don't merge with new/untouched ones visually. 
+									-->
 									{#if /[\p{L}\p{N}]+/gu.test(message.rewriteHistory.at(index + 1)?.text ?? '')}
 										<span>{' '}</span>
 									{/if}
@@ -154,7 +158,12 @@
 	{/if}
 </div>
 
-<form method="post" action="?/replyAndCorrect" class="composer" use:enhance={replyAndCorrect.enhance}>
+<form
+	method="post"
+	action="?/replyAndCorrect"
+	class="composer"
+	use:enhance={replyAndCorrect.enhance}
+>
 	{#if replyAndCorrect.view.status === 'failure'}
 		<p>Error al enviar</p>
 	{/if}

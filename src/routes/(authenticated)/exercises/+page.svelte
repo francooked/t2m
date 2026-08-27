@@ -66,6 +66,12 @@
 		margin-top: 0;
 	}
 
+	li {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
 	.more {
 		color: var(--muted);
 		font-size: 0.85rem;

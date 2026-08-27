@@ -20,9 +20,24 @@
 <p class="diff">
 	{#each data.review.differences as { added, removed, value }, i (i)}
 		{#if added}
-			<span class="add">{value}</span>
+			{#if value.trim() === ''}
+				<span>{value}</span>
+			{:else}
+				<span class="add">{value}</span>
+			{/if}
 		{:else if removed}
-			<span class="rm">{value}</span>
+			{#if value.trim() === ''}
+				<span>{value}</span>
+			{:else}
+				<span class="rm">{value}</span>
+			{/if}
+			<!-- 
+			Add a space after a removed chunk if the next difference also starts with a word/number character,
+			so that deleted tokens don't merge with new/untouched ones visually. 
+			-->
+			{#if /[\p{L}\p{N}]+/gu.test(data.review.differences.at(i + 1)?.value ?? '')}
+				<span>{' '}</span>
+			{/if}
 		{:else}
 			<span>{value}</span>
 		{/if}

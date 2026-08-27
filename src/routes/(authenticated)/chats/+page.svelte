@@ -31,7 +31,7 @@
 
 {#each data.chats as chat (chat.id)}
 	<div class="row">
-		<a href={`/chats/${chat.id}`}>{chat.title}</a>
+		<a href={`/chats/${chat.id}`} title={chat.title}>{chat.title}</a>
 		<form method="post" action="?/deleteChat" use:enhance={deleteChat.enhance}>
 			<button type="submit" disabled={deleteChat.view.status === 'pending'}>
 				{deleteChat.view.status === 'pending' ? 'Cargando' : 'Eliminar'}
@@ -78,7 +78,11 @@
 	}
 
 	.row a {
-		font-size: 1rem;
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.row button {

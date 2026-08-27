@@ -69,7 +69,7 @@ export const actions = {
 					.insert(schema.chat)
 					.values({
 						targetLanguage: data.targetLanguage,
-						title: 'Nueva conversación',
+						title: data.content.slice(0, 64),
 						userId: signedInUser.id
 					})
 					.returning({ id: schema.chat.id })
