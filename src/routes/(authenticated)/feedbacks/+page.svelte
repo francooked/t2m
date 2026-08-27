@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { createFormView } from '$lib/forms/create-form-view.svelte';
 	import {
-		GIVE_FEEDBACK_CHAT_ID,
+		GIVE_FEEDBACK_ID,
 		giveFeedbackFailure,
 		giveFeedbackSuccess
 	} from '$lib/forms/give-feedback';
@@ -11,7 +11,7 @@
 	const { data, form }: PageProps = $props();
 
 	const giveFeedback = createFormView({
-		id: GIVE_FEEDBACK_CHAT_ID,
+		id: GIVE_FEEDBACK_ID,
 		success: giveFeedbackSuccess,
 		failure: giveFeedbackFailure,
 		getForm: () => form

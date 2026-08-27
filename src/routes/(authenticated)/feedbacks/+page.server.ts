@@ -15,13 +15,13 @@ import {
 import { groq, parseLlmResponse } from '$lib/server/groq';
 import { createFormResponders } from '$lib/forms/result.server';
 import {
-	GIVE_FEEDBACK_CHAT_ID,
+	GIVE_FEEDBACK_ID,
 	giveFeedbackFailure,
 	giveFeedbackSuccess
 } from '$lib/forms/give-feedback';
 
 const giveFeedback = createFormResponders({
-	id: GIVE_FEEDBACK_CHAT_ID,
+	id: GIVE_FEEDBACK_ID,
 	success: giveFeedbackSuccess,
 	failure: giveFeedbackFailure
 });
