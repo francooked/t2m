@@ -18,36 +18,81 @@
 	});
 </script>
 
-<h1 class="underline">Feedbacks</h1>
+<h1>Retroalimentaciones</h1>
 
 {#each data.feedbacks as feedback (feedback.id)}
 	{#if feedback.payload.version === 1}
 		{@const payload = feedback.payload.payload}
-		{#each payload.patterns as pattern}
-			<div>
+		{#each payload.patterns as pattern, i (i)}
+			<section>
+				<p class="what">{pattern.what}</p>
+				<p>{pattern.why}</p>
+				<p>{pattern.how}</p>
+				<p class="sounds">{pattern.soundsLike}</p>
 				<ul>
-					<li>what: {pattern.what}</li>
-					<li>why: {pattern.why}</li>
-					<li>how: {pattern.how}</li>
-					<li>soundsLike: {pattern.soundsLike}</li>
-				</ul>
-				<ul>
-					{#each pattern.examples as example}
-						<li>wrote: {example.wrote} - instead: {example.instead}</li>
+					{#each pattern.examples as example, j (j)}
+						<li>
+							<span class="wrote">{example.wrote}</span>
+							<span class="arrow">→</span>
+							<span>{example.instead}</span>
+						</li>
 					{/each}
 				</ul>
-			</div>
+			</section>
 		{/each}
 	{/if}
 {:else}
-	<p>Sin retroalimentaciones</p>
+	<p class="empty">Sin retroalimentaciones</p>
 {/each}
 
 <form method="post" action="?/giveFeedback" use:enhance={giveFeedback.enhance}>
 	{#if giveFeedback.view.status === 'failure'}
 		<p>Ocurrió un error</p>
 	{/if}
-	<button type="submit" class="font-medium" disabled={giveFeedback.view.status === 'pending'}
-		>{giveFeedback.view.status === 'pending' ? 'Cargando' : '¿Dónde estoy fallando?'}</button
-	>
+	<button type="submit" disabled={giveFeedback.view.status === 'pending'}>
+		{giveFeedback.view.status === 'pending' ? 'Cargando' : '¿Dónde estoy fallando?'}
+	</button>
 </form>
+
+<style>
+	section {
+		padding: 1.1rem 0 0.35rem;
+		border-top: 1px solid var(--line);
+	}
+
+	section:first-of-type {
+		border-top: 0;
+		padding-top: 0;
+	}
+
+	.what {
+		font-weight: 600;
+		margin-bottom: 0.4rem;
+	}
+
+	.sounds {
+		color: var(--muted);
+		font-size: 0.9rem;
+	}
+
+	.wrote {
+		color: var(--muted);
+		text-decoration: line-through;
+	}
+
+	.arrow {
+		color: var(--muted);
+		margin: 0 0.35rem;
+	}
+
+	.empty {
+		color: var(--muted);
+		padding: 1rem 0 1.5rem;
+	}
+
+	form {
+		margin-top: 1.75rem;
+		padding-top: 1.25rem;
+		border-top: 1px solid var(--line);
+	}
+</style>

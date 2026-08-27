@@ -14,11 +14,13 @@
 	});
 </script>
 
-<form method="post" action="?/signOut" class="p-2" use:enhance={signOut.enhance}>
+<h1>Sesión</h1>
+
+<form method="post" action="?/signOut" use:enhance={signOut.enhance}>
 	{#if signOut.view.status === 'failure'}
 		<p>Error al cerrar sesión</p>
 	{/if}
-	<button type="submit" class="font-medium" disabled={signOut.view.status === 'pending'}
-		>{signOut.view.status === 'pending' ? 'Cargando' : 'Sign Out'}</button
-	>
+	<button type="submit" disabled={signOut.view.status === 'pending'}>
+		{signOut.view.status === 'pending' ? 'Cargando' : 'Cerrar sesión'}
+	</button>
 </form>

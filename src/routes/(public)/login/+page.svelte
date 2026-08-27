@@ -25,39 +25,71 @@
 	const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 </script>
 
-<form class="p-2" method="post" action="?/signInEmail" use:enhance={signIn.enhance}>
-	{#if signIn.view.status === 'failure'}
-		<p>Error al iniciar sesión</p>
-	{/if}
-	<h1 class="font-bold underline">Iniciar sesión</h1>
-	<label for="signin_username">Correo</label>
-	<input id="signin_username" name="email" type="email" />
-	<label for="signin_password">Contraseña</label>
-	<input id="signin_password" name="password" type="password" />
-	<button type="submit" disabled={signIn.view.status === 'pending'}
-		>{signIn.view.status === 'pending' ? 'Cargando' : 'Iniciar sesión'}</button
-	>
-</form>
+<section>
+	<h1>Iniciar sesión</h1>
+	<form method="post" action="?/signInEmail" use:enhance={signIn.enhance}>
+		{#if signIn.view.status === 'failure'}
+			<p>Error al iniciar sesión</p>
+		{/if}
+		<label for="signin_username">Correo</label>
+		<input id="signin_username" name="email" type="email" />
+		<label for="signin_password">Contraseña</label>
+		<input id="signin_password" name="password" type="password" />
+		<button type="submit" disabled={signIn.view.status === 'pending'}>
+			{signIn.view.status === 'pending' ? 'Cargando' : 'Iniciar sesión'}
+		</button>
+	</form>
+</section>
 
-<form class="p-2" method="post" action="?/signUpEmail" use:enhance={signUp.enhance}>
-	{#if signUp.view.status === 'failure'}
-		<p>Error al registrar</p>
-	{/if}
-	<h1 class="font-bold underline">Registrarse</h1>
-	<label for="signup_email">Correo</label>
-	<input id="signup_email" name="email" type="email" />
-	<label for="signup_password">Contraseña</label>
-	<input id="signup_password" name="password" type="password" />
-	<label for="signup_name">Nombre</label>
-	<input id="signup_name" name="name" type="text" />
-	<label for="signup_native_language">Idioma Nativo</label>
-	<select id="signup_native_language" name="native_language">
-		{#each LANGUAGE_CODES as languageCode}
-			<option value={languageCode}>{LANGUAGE_CODE_LABELS.es[languageCode]}</option>
-		{/each}
-	</select>
-	<input type="hidden" name="time_zone" value={timeZone} />
-	<button type="submit" disabled={signUp.view.status === 'pending'}
-		>{signUp.view.status === 'pending' ? 'Cargando' : 'Registrarse'}</button
-	>
-</form>
+<p class="divider">o</p>
+
+<section>
+	<h1>Registrarse</h1>
+	<form method="post" action="?/signUpEmail" use:enhance={signUp.enhance}>
+		{#if signUp.view.status === 'failure'}
+			<p>Error al registrar</p>
+		{/if}
+		<label for="signup_email">Correo</label>
+		<input id="signup_email" name="email" type="email" />
+		<label for="signup_password">Contraseña</label>
+		<input id="signup_password" name="password" type="password" />
+		<label for="signup_name">Nombre</label>
+		<input id="signup_name" name="name" type="text" />
+		<label for="signup_native_language">Idioma nativo</label>
+		<select id="signup_native_language" name="native_language">
+			{#each LANGUAGE_CODES as languageCode (languageCode)}
+				<option value={languageCode}>{LANGUAGE_CODE_LABELS.es[languageCode]}</option>
+			{/each}
+		</select>
+		<input type="hidden" name="time_zone" value={timeZone} />
+		<button type="submit" disabled={signUp.view.status === 'pending'}>
+			{signUp.view.status === 'pending' ? 'Cargando' : 'Registrarse'}
+		</button>
+	</form>
+</section>
+
+<style>
+	form {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.divider {
+		display: flex;
+		align-items: center;
+		gap: 0.85rem;
+		margin: 2rem 0 1.5rem;
+		color: var(--muted);
+		font-size: 0.72rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	.divider::before,
+	.divider::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: var(--line);
+	}
+</style>
