@@ -24,10 +24,9 @@
 		"db:studio": "drizzle-kit studio",
 		"db:seed": "tsx --env-file=.env src/lib/server/db/seed/seed.ts",
 		"db:clear": "tsx --env-file=.env src/lib/server/db/seed/reset.ts",
-		"auth:schema": "better-auth generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes"
+		"auth:schema": "npx auth@latest generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes"
 	},
 	"devDependencies": {
-		"@better-auth/cli": "~1.4.21",
 		"@eslint/compat": "^2.1.0",
 		"@eslint/js": "^10.0.1",
 		"@internationalized/date": "^3.12.3",
@@ -40,7 +39,8 @@
 		"@types/ndjson": "^2.0.4",
 		"@types/node": "^24.13.3",
 		"@vitest/browser-playwright": "^4.1.0",
-		"better-auth": "~1.4.21",
+		"auth": "^1.7.2",
+		"better-auth": "^1.7.2",
 		"dedent": "^1.7.2",
 		"diff": "^9.0.0",
 		"drizzle-kit": "^0.31.10",

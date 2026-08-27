@@ -12,6 +12,7 @@ declare global {
 		interface Error {
 			code?: string;
 		}
+
 		// interface PageData {}
 		// interface PageState {}
 		// interface Platform {}

@@ -153,3 +153,6 @@ export const feedback = pgTable('feedback', {
 	createdAt: timestamp('created_at').defaultNow().notNull(),
 	payload: jsonb('payload').$type<FeedbackPayloadSchema>().notNull()
 });
+
+export * from './auth.schema';
+export * from './fsrs.schema';
