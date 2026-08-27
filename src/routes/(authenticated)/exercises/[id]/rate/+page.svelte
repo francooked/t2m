@@ -4,7 +4,7 @@
 	import { createFormView } from '$lib/forms/create-form-view.svelte';
 	import type { PageProps } from './$types';
 
-	let { data, form, params }: PageProps = $props();
+	let { data, form }: PageProps = $props();
 
 	let rate = createFormView({
 		id: RATE_ID,
@@ -43,7 +43,6 @@
 		<option value="good">Good</option>
 		<option value="easy">Easy</option>
 	</select>
-	<input type="hidden" name="exercise_id" value={params.id} />
 	<button type="submit" disabled={rate.view.status === 'pending'}
 		>{rate.view.status === 'pending' ? 'Cargando' : 'Enviar'}</button
 	>

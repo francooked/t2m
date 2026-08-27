@@ -22,6 +22,7 @@ import {
 	retryCorrectionSuccess
 } from '$lib/forms/retry-correction';
 import { parseExercisePayload } from '$lib/exercise/parse-exercise';
+import { paramsSchema } from './lib/params';
 
 type BaseMessage = {
 	id: number;
@@ -63,11 +64,15 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const signedInUser = requireUserSession(locals);
 	if (!signedInUser) return redirect(302, '/login');
 
+	const paramsParse = paramsSchema.safeParse(params);
+	if (!paramsParse.success) return redirect(302, '/chats');
+	const { id: chatId } = paramsParse.data;
+
 	const chat = (
 		await db
 			.select({ id: schema.chat.id, targetLanguage: schema.chat.targetLanguage })
 			.from(schema.chat)
-			.where(and(eq(schema.chat.id, parseInt(params.id)), eq(schema.chat.userId, signedInUser.id)))
+			.where(and(eq(schema.chat.id, chatId), eq(schema.chat.userId, signedInUser.id)))
 	).at(0);
 
 	if (!chat) {
@@ -90,7 +95,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				})
 				.from(schema.message)
 				.leftJoin(schema.messageRewrite, eq(schema.message.id, schema.messageRewrite.messageId))
-				.where(eq(schema.message.chatId, Number(params.id)))
+				.where(eq(schema.message.chatId, chat.id))
 				.orderBy(schema.message.id),
 			({ id }) => id
 		)
@@ -155,32 +160,35 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions = {
-	replyAndCorrect: async ({ request, locals }) => {
+	replyAndCorrect: async ({ request, locals, params }) => {
 		const signedInUser = requireUserSession(locals);
 		if (!signedInUser) return redirect(303, '/chats');
 
-		const formData = await request.formData();
-		const zodSchema = z.object({
-			chatId: z.number().positive(),
-			content: z
-				.string()
-				.trim()
-				.min(1)
-				.transform((content) => normalizeText(content))
-		});
-		const { success, data } = zodSchema.safeParse({
-			chatId: parseInt(formData.get('chat_id')?.toString() ?? '-1'),
-			content: formData.get('content')?.toString() ?? ''
-		});
+		const paramsParse = paramsSchema.safeParse(params);
+		if (!paramsParse.success) {
+			return replyAndCorrectResponders.fail({ error: { code: 'chat_not_found' }, status: 400 });
+		}
+		const { id: chatId } = paramsParse.data;
 
-		if (!success)
+		const formData = await request.formData();
+		const formDataParse = z
+			.object({
+				content: z
+					.string()
+					.trim()
+					.min(1)
+					.transform((content) => normalizeText(content))
+			})
+			.safeParse({ content: formData.get('content')?.toString() ?? '' });
+
+		if (!formDataParse.success)
 			return replyAndCorrectResponders.fail({ error: { code: 'invalid_input' }, status: 400 });
 
 		const chat = (
 			await db
 				.select({ id: schema.chat.id })
 				.from(schema.chat)
-				.where(and(eq(schema.chat.id, data.chatId), eq(schema.chat.userId, signedInUser.id)))
+				.where(and(eq(schema.chat.id, chatId), eq(schema.chat.userId, signedInUser.id)))
 		).at(0);
 
 		if (!chat)
@@ -189,8 +197,8 @@ export const actions = {
 		const newMessages = await db
 			.insert(schema.message)
 			.values([
-				{ chatId: data.chatId, content: data.content, role: 'user', status: 'pending' },
-				{ chatId: data.chatId, content: '', role: 'assistant', status: 'pending' }
+				{ chatId: chat.id, content: formDataParse.data.content, role: 'user', status: 'pending' },
+				{ chatId: chat.id, content: '', role: 'assistant', status: 'pending' }
 			])
 			.returning({ id: schema.message.id });
 
@@ -204,7 +212,7 @@ export const actions = {
 		try {
 			await processChatTurn({
 				userId: signedInUser.id,
-				chatId: data.chatId,
+				chatId: chat.id,
 				userMessageId: newUserMessage.id,
 				assistantMessageId: newAssistantMessage.id
 			});
@@ -215,25 +223,29 @@ export const actions = {
 
 		return replyAndCorrectResponders.ok({ data: null });
 	},
-	retryReply: async ({ request, locals }) => {
+	retryReply: async ({ request, locals, params }) => {
 		const signedInUser = requireUserSession(locals);
 		if (!signedInUser) return redirect(303, '/chats');
 
-		const formData = await request.formData();
-		const zodSchema = z.object({ chatId: z.number().positive(), messageId: z.number().positive() });
-		const { success, data } = zodSchema.safeParse({
-			chatId: parseInt(formData.get('chat_id')?.toString() ?? '-1'),
-			messageId: parseInt(formData.get('message_id')?.toString() ?? '-1')
-		});
+		const paramsParse = paramsSchema.safeParse(params);
+		if (!paramsParse.success) {
+			return retryReplyResponders.fail({ error: { code: 'invalid_input' }, status: 400 });
+		}
+		const { id: chatId } = paramsParse.data;
 
-		if (!success)
+		const formData = await request.formData();
+		const formDataParse = z
+			.object({ messageId: z.number().positive() })
+			.safeParse({ messageId: parseInt(formData.get('message_id')?.toString() ?? '-1') });
+
+		if (!formDataParse.success)
 			return retryReplyResponders.fail({ error: { code: 'invalid_input' }, status: 400 });
 
 		try {
 			await retryReply({
 				userId: signedInUser.id,
-				chatId: data.chatId,
-				assistantMessageId: data.messageId
+				chatId,
+				assistantMessageId: formDataParse.data.messageId
 			});
 		} catch (error) {
 			console.error(error);
@@ -242,18 +254,22 @@ export const actions = {
 
 		return retryReplyResponders.ok({ data: null });
 	},
-	retryCorrection: async ({ request, locals }) => {
+	retryCorrection: async ({ request, locals, params }) => {
 		const signedInUser = requireUserSession(locals);
 		if (!signedInUser) return redirect(303, '/chats');
 
-		const formData = await request.formData();
-		const zodSchema = z.object({ chatId: z.number().positive(), messageId: z.number().positive() });
-		const { success, data } = zodSchema.safeParse({
-			chatId: parseInt(formData.get('chat_id')?.toString() ?? '-1'),
-			messageId: parseInt(formData.get('message_id')?.toString() ?? '-1')
-		});
+		const paramsParse = paramsSchema.safeParse(params);
+		if (!paramsParse.success) {
+			return retryCorrectionResponders.fail({ error: { code: 'invalid_input' }, status: 400 });
+		}
+		const { id: chatId } = paramsParse.data;
 
-		if (!success) {
+		const formData = await request.formData();
+		const formDataParse = z
+			.object({ messageId: z.number().positive() })
+			.safeParse({ messageId: parseInt(formData.get('message_id')?.toString() ?? '-1') });
+
+		if (!formDataParse.success) {
 			return retryCorrectionResponders.fail({
 				error: { code: 'invalid_input' },
 				status: 400
@@ -263,8 +279,8 @@ export const actions = {
 		try {
 			await retryCorrection({
 				userId: signedInUser.id,
-				chatId: data.chatId,
-				userMessageId: data.messageId
+				chatId,
+				userMessageId: formDataParse.data.messageId
 			});
 		} catch (error) {
 			console.error(error);

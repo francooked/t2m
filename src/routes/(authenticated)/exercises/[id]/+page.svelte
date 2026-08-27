@@ -27,6 +27,5 @@
 		<button type="submit" disabled={answer.view.status === 'pending'}
 			>{answer.view.status === 'pending' ? 'Cargando' : 'Responder'}</button
 		>
-		<input type="hidden" name="exercise_id" value={data.exercise.id} />
 	</form>
 {/if}

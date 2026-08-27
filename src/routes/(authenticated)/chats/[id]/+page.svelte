@@ -16,7 +16,7 @@
 		retryCorrectionSuccess
 	} from '$lib/forms/retry-correction';
 
-	const { data, params, form }: PageProps = $props();
+	const { data, form }: PageProps = $props();
 	const popover = new Popover();
 	let triggerData = $state<{ reason: string } | null>();
 
@@ -67,7 +67,6 @@
 							disabled={retryReply.view.status === 'pending'}
 							>{retryReply.view.status === 'pending' ? 'Cargando' : 'Reintentar'}</button
 						>
-						<input type="hidden" name="chat_id" value={params.id} />
 						<input type="hidden" name="message_id" value={message.id} />
 					</form>
 				{/if}
@@ -136,7 +135,6 @@
 							disabled={retryCorrection.view.status === 'pending'}
 							>{retryCorrection.view.status === 'pending' ? 'Cargando' : 'Reintentar'}</button
 						>
-						<input type="hidden" name="chat_id" value={params.id} />
 						<input type="hidden" name="message_id" value={message.id} />
 					</form>
 				{/if}
@@ -159,7 +157,6 @@
 	<button type="submit" class="font-medium" disabled={replyAndCorrect.view.status === 'pending'}
 		>{replyAndCorrect.view.status === 'pending' ? 'Cargando' : 'Enviar'}</button
 	>
-	<input type="hidden" name="chat_id" value={params.id} />
 </form>
 
 <h1 class="font-bold underline">Ejercicios generados</h1>

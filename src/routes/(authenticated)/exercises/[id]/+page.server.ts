@@ -13,6 +13,7 @@ import { createFormResponders } from '$lib/forms/result.server';
 import { ANSWER_ID, answerFailure, answerSuccess } from '$lib/forms/answer';
 import { parseExercisePayload, toPublicExercisePayload } from '$lib/exercise/parse-exercise';
 import { groq, parseLlmResponse } from '$lib/server/groq';
+import { paramsSchema } from './lib/params';
 
 const answer = createFormResponders({
 	id: ANSWER_ID,
@@ -45,7 +46,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const signedInUser = requireUserSession(locals);
 	if (!signedInUser) return redirect(302, '/login');
 
-	const exerciseId = Number(params.id);
+	const paramsParse = paramsSchema.safeParse(params);
+	if (!paramsParse.success) return redirect(302, '/exercises');
+	const { id: exerciseId } = paramsParse.data;
 
 	const exercise = (
 		await db
@@ -91,19 +94,18 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions = {
-	answer: async ({ request, locals }) => {
+	answer: async ({ request, locals, params }) => {
 		const signedInUser = requireUserSession(locals);
 		if (!signedInUser) return redirect(303, '/login');
 
+		const paramsParse = paramsSchema.safeParse(params);
+		if (!paramsParse.success) return redirect(303, '/exercises');
+		const { id: exerciseId } = paramsParse.data;
+
 		const formData = await request.formData();
-		const formDataSchema = z.object({
-			exerciseId: z.number(),
-			answer: z.string().trim().min(1)
-		});
-		const formDataParse = formDataSchema.safeParse({
-			exerciseId: parseInt(formData.get('exercise_id')?.toString() ?? '-1'),
-			answer: formData.get('answer')?.toString().trim()
-		});
+		const formDataParse = z
+			.object({ answer: z.string().trim().min(1) })
+			.safeParse({ answer: formData.get('answer')?.toString().trim() });
 
 		if (!formDataParse.success) {
 			return answer.fail({ error: { code: 'invalid_input' }, status: 400 });
@@ -121,7 +123,7 @@ export const actions = {
 				.innerJoin(schema.userProfile, eq(schema.exercise.userId, schema.userProfile.userId))
 				.where(
 					and(
-						eq(schema.exercise.id, formDataParse.data.exerciseId),
+						eq(schema.exercise.id, exerciseId),
 						eq(schema.exercise.userId, signedInUser.id),
 						isNull(schema.exercise.archivedAt)
 					)

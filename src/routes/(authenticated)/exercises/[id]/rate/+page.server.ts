@@ -18,6 +18,7 @@ import {
 	resolveNextPendingExercises,
 	resolveNextUnratedExercises
 } from '$lib/server/exercise/next-exercise';
+import { paramsSchema } from '../lib/params';
 
 const rate = createFormResponders({
 	id: RATE_ID,
@@ -29,7 +30,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const signedInUser = requireUserSession(locals);
 	if (!signedInUser) return redirect(302, '/login');
 
-	const exerciseId = Number(params.id);
+	const paramsParse = paramsSchema.safeParse(params);
+	if (!paramsParse.success) return redirect(302, '/exercises');
+	const { id: exerciseId } = paramsParse.data;
 
 	const exercise = (
 		await db
@@ -100,19 +103,18 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions = {
-	rate: async ({ request, locals }) => {
+	rate: async ({ request, locals, params }) => {
 		const signedInUser = requireUserSession(locals);
 		if (!signedInUser) return redirect(303, '/login');
 
+		const paramsParse = paramsSchema.safeParse(params);
+		if (!paramsParse.success) return redirect(303, '/exercises');
+		const { id: exerciseId } = paramsParse.data;
+
 		const formData = await request.formData();
-		const formDataSchema = z.object({
-			exerciseId: z.number(),
-			rating: z.enum(['again', 'hard', 'good', 'easy'])
-		});
-		const formDataParse = formDataSchema.safeParse({
-			exerciseId: parseInt(formData.get('exercise_id')?.toString() ?? '-1'),
-			rating: formData.get('rating')?.toString() ?? ''
-		});
+		const formDataParse = z
+			.object({ rating: z.enum(['again', 'hard', 'good', 'easy']) })
+			.safeParse({ rating: formData.get('rating')?.toString() ?? '' });
 
 		if (!formDataParse.success) {
 			return rate.fail({ error: { code: 'invalid_input' }, status: 400 });
@@ -147,7 +149,7 @@ export const actions = {
 				.from(schema.exercise)
 				.where(
 					and(
-						eq(schema.exercise.id, formDataParse.data.exerciseId),
+						eq(schema.exercise.id, exerciseId),
 						eq(schema.exercise.userId, signedInUser.id),
 						isNull(schema.exercise.archivedAt)
 					)
@@ -198,7 +200,7 @@ export const actions = {
 					.where(
 						and(
 							eq(fsrsSchema.fsrsCard.userId, signedInUser.id),
-							eq(fsrsSchema.fsrsCard.exerciseId, formDataParse.data.exerciseId)
+							eq(fsrsSchema.fsrsCard.exerciseId, exerciseId)
 						)
 					)
 					.limit(1)
@@ -220,7 +222,7 @@ export const actions = {
 						.set({ ratedAt: reviewDate })
 						.where(
 							and(
-								eq(schema.exerciseCheck.exerciseId, formDataParse.data.exerciseId),
+								eq(schema.exerciseCheck.exerciseId, exerciseId),
 								isNull(schema.exerciseCheck.ratedAt)
 							)
 						)
@@ -243,7 +245,7 @@ export const actions = {
 							.insert(fsrsSchema.fsrsCard)
 							.values({
 								userId: signedInUser.id,
-								exerciseId: formDataParse.data.exerciseId,
+								exerciseId: exerciseId,
 								stateBlob: recordLogItem.card,
 								nextDueAt: recordLogItem.card.due
 							})
@@ -275,7 +277,7 @@ export const actions = {
 						.where(
 							and(
 								eq(fsrsSchema.fsrsCard.userId, signedInUser.id),
-								eq(fsrsSchema.fsrsCard.exerciseId, formDataParse.data.exerciseId)
+								eq(fsrsSchema.fsrsCard.exerciseId, exerciseId)
 							)
 						);
 
