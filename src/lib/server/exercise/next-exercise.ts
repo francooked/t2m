@@ -36,7 +36,7 @@ export async function resolveNextPendingExercises({
 	reviewDate
 }: {
 	userId: (typeof authSchema.user.$inferSelect)['id'];
-	timeZone: (typeof schema.userProfile.$inferSelect)['timeZone'];
+	timeZone: (typeof schema.user.$inferSelect)['timeZone'];
 	reviewDate: Date;
 }) {
 	const endOfStudyDay = startOfTomorrowInTimeZone(reviewDate, timeZone);

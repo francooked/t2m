@@ -50,7 +50,7 @@
 	<textarea name="content" placeholder="¿Por dónde partimos?"></textarea>
 	<select name="target_language">
 		{#each LANGUAGE_CODES as languageCode (languageCode)}
-			{#if data.userProfile.nativeLanguage !== languageCode}
+			{#if data.signedInUser.nativeLanguage !== languageCode}
 				<option value={languageCode}>{LANGUAGE_CODE_LABELS.es[languageCode]}</option>
 			{/if}
 		{/each}

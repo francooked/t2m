@@ -52,16 +52,6 @@ export const actions = {
 		const signedInUser = requireUserSession(locals);
 		if (!signedInUser) return redirect(303, '/login');
 
-		const userProfile = (
-			await db
-				.select({ nativeLanguage: schema.userProfile.nativeLanguage })
-				.from(schema.userProfile)
-				.where(eq(schema.userProfile.userId, signedInUser.id))
-				.limit(1)
-		).at(0);
-
-		if (!userProfile) return redirect(303, '/login');
-
 		try {
 			const mistakesByLanguage = (
 				await db
@@ -102,7 +92,7 @@ export const actions = {
 						fn: async () => {
 							const chatCompletion = await groq.chat.completions.create({
 								messages: buildErrorPatternPrompt({
-									nativeLanguage: userProfile.nativeLanguage,
+									nativeLanguage: signedInUser.nativeLanguage,
 									targetLanguage,
 									mistakes
 								}),

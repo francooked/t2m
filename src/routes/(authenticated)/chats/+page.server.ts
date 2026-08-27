@@ -29,38 +29,18 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const signedInUser = requireUserSession(locals);
 	if (!signedInUser) return redirect(302, '/login');
 
-	const userProfile = (
-		await db
-			.select({ nativeLanguage: schema.userProfile.nativeLanguage })
-			.from(schema.userProfile)
-			.where(eq(schema.userProfile.userId, signedInUser.id))
-			.limit(1)
-	).at(0);
-
-	if (!userProfile) return redirect(302, '/login');
-
 	const chats = await db
 		.select({ id: schema.chat.id, title: schema.chat.title })
 		.from(schema.chat)
 		.where(eq(schema.chat.userId, signedInUser.id));
 
-	return { chats, userProfile };
+	return { chats };
 };
 
 export const actions = {
 	startChat: async ({ request, locals }) => {
 		const signedInUser = requireUserSession(locals);
 		if (!signedInUser) return redirect(303, '/login');
-
-		const userProfile = (
-			await db
-				.select({ nativeLanguage: schema.userProfile.nativeLanguage })
-				.from(schema.userProfile)
-				.where(eq(schema.userProfile.userId, signedInUser.id))
-				.limit(1)
-		).at(0);
-
-		if (!userProfile) return redirect(303, '/login');
 
 		const formData = await request.formData();
 		const zodSchema = z.object({
@@ -69,9 +49,11 @@ export const actions = {
 				.trim()
 				.min(1)
 				.transform((content) => normalizeText(content)),
-			targetLanguage: z.enum(LANGUAGE_CODES).refine((code) => code !== userProfile.nativeLanguage, {
-				error: 'You cannot chat in your native language'
-			})
+			targetLanguage: z
+				.enum(LANGUAGE_CODES)
+				.refine((code) => code !== signedInUser.nativeLanguage, {
+					error: 'You cannot chat in your native language'
+				})
 		});
 		const { success, data } = zodSchema.safeParse({
 			content: formData.get('content')?.toString() ?? '',

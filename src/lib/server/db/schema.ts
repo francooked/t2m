@@ -12,7 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { isNull } from 'drizzle-orm';
 import { user } from './auth.schema';
-import { LANGUAGE_CODES, MESSAGE_STATUS, ROLES, SRS_ALGORITHMS, TIME_ZONES } from '$lib/constants';
+import { LANGUAGE_CODES, MESSAGE_STATUS, ROLES, SRS_ALGORITHMS } from '$lib/constants';
 import type { ExercisePayload } from '$lib/exercise/exercise-payload';
 import type { ExerciseCheckPayload } from '$lib/exercise/exercise-check-payload';
 import type { FeedbackPayloadSchema } from '$lib/feedback/feedback-payload';
@@ -21,20 +21,6 @@ export const languageCodeEnum = pgEnum('language_code', LANGUAGE_CODES);
 export const messageRoleEnum = pgEnum('message_role', ROLES);
 export const messageStatusEnum = pgEnum('message_status', MESSAGE_STATUS);
 export const srsAlgorithmEnum = pgEnum('srs_algorithm', SRS_ALGORITHMS);
-export const timeZoneEnum = pgEnum('time_zone', TIME_ZONES);
-
-export const userProfile = pgTable('user_profile', {
-	userId: text('user_id')
-		.primaryKey()
-		.references(() => user.id, { onDelete: 'cascade' }),
-	nativeLanguage: languageCodeEnum('native_language').notNull(),
-	timeZone: timeZoneEnum('time_zone').notNull(),
-	createdAt: timestamp('created_at').defaultNow().notNull(),
-	updatedAt: timestamp('updated_at')
-		.defaultNow()
-		.$onUpdate(() => new Date())
-		.notNull()
-});
 
 export const userSrsProfile = pgTable('user_srs_profile', {
 	userId: text('user_id')
@@ -100,7 +86,6 @@ export const exercise = pgTable(
 			.references(() => user.id, { onDelete: 'cascade' })
 			.notNull(),
 		targetLanguage: languageCodeEnum('target_language').notNull(),
-		source: jsonb('source').$type<{ messageRewriteId: number }>().notNull(),
 		payload: jsonb('payload').$type<ExercisePayload>().notNull(),
 		createdAt: timestamp('created_at').defaultNow().notNull(),
 		archivedAt: timestamp('archived_at')
@@ -145,14 +130,18 @@ export const exerciseMessageRewrite = pgTable(
 	(table) => [primaryKey({ columns: [table.exerciseId, table.messageRewriteId] })]
 );
 
-export const feedback = pgTable('feedback', {
-	id: serial('id').primaryKey(),
-	userId: text('user_id')
-		.references(() => user.id, { onDelete: 'cascade' })
-		.notNull(),
-	createdAt: timestamp('created_at').defaultNow().notNull(),
-	payload: jsonb('payload').$type<FeedbackPayloadSchema>().notNull()
-});
+export const feedback = pgTable(
+	'feedback',
+	{
+		id: serial('id').primaryKey(),
+		userId: text('user_id')
+			.references(() => user.id, { onDelete: 'cascade' })
+			.notNull(),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		payload: jsonb('payload').$type<FeedbackPayloadSchema>().notNull()
+	},
+	(table) => [index('feedback_userId_idx').on(table.userId)]
+);
 
 export * from './auth.schema';
 export * from './fsrs.schema';

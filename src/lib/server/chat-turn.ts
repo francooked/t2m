@@ -66,13 +66,13 @@ async function loadChat({ userId, chatId }: { userId: string; chatId: number }) 
 		await db
 			.select({
 				id: schema.chat.id,
-				userId: schema.userProfile.userId,
-				nativeLanguage: schema.userProfile.nativeLanguage,
+				userId: schema.user.id,
+				nativeLanguage: schema.user.nativeLanguage,
 				targetLanguage: schema.chat.targetLanguage
 			})
 			.from(schema.chat)
 			.innerJoin(schema.message, eq(schema.chat.id, schema.message.chatId))
-			.innerJoin(schema.userProfile, eq(schema.chat.userId, schema.userProfile.userId))
+			.innerJoin(schema.user, eq(schema.chat.userId, schema.user.id))
 			.where(and(eq(schema.chat.userId, userId), eq(schema.chat.id, chatId)))
 			.limit(1)
 	).at(0);
@@ -260,7 +260,6 @@ async function correctUserMessage({
 				.values({
 					userId: chat.userId,
 					targetLanguage: chat.targetLanguage,
-					source: { messageRewriteId: lastMessageRewrite.id },
 					payload: { type: 'full_answer', version: 1, payload: { front, back, extra } }
 				})
 				.returning({ id: schema.exercise.id })

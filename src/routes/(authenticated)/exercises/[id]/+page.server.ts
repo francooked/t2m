@@ -117,10 +117,10 @@ export const actions = {
 					id: schema.exercise.id,
 					payload: schema.exercise.payload,
 					targetLanguage: schema.exercise.targetLanguage,
-					nativeLanguage: schema.userProfile.nativeLanguage
+					nativeLanguage: schema.user.nativeLanguage
 				})
 				.from(schema.exercise)
-				.innerJoin(schema.userProfile, eq(schema.exercise.userId, schema.userProfile.userId))
+				.innerJoin(schema.user, eq(schema.exercise.userId, schema.user.id))
 				.where(
 					and(
 						eq(schema.exercise.id, exerciseId),

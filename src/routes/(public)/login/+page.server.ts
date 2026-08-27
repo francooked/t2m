@@ -3,7 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { auth } from '$lib/server/auth';
 import { APIError } from 'better-auth/api';
 import z from 'zod';
-import { LANGUAGE_CODES, TIME_ZONES } from '$lib/constants';
+import { LANGUAGE_CODES } from '$lib/constants';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/db/schema';
 import { generatorParameters } from 'ts-fsrs';
@@ -36,7 +36,7 @@ export const actions = {
 			password: z.string().min(1),
 			name: z.string().min(1),
 			nativeLanguage: z.enum(LANGUAGE_CODES),
-			timeZone: z.enum(TIME_ZONES)
+			timeZone: z.string().min(1)
 		});
 		const formData = await request.formData();
 		const formDataParse = formDataSchema.safeParse({
@@ -53,17 +53,10 @@ export const actions = {
 
 		try {
 			const { user } = await auth.api.signUpEmail({ body: { ...formDataParse.data } });
-			await db.transaction(async (tx) => {
-				await tx.insert(schema.userProfile).values({
-					userId: user.id,
-					nativeLanguage: formDataParse.data.nativeLanguage,
-					timeZone: formDataParse.data.timeZone
-				});
-				const fsrsParameters = generatorParameters();
-				await tx
-					.insert(schema.userSrsProfile)
-					.values({ userId: user.id, algorithm: 'fsrs', setup: fsrsParameters });
-			});
+			const fsrsParameters = generatorParameters();
+			await db
+				.insert(schema.userSrsProfile)
+				.values({ userId: user.id, algorithm: 'fsrs', setup: fsrsParameters });
 		} catch (error) {
 			console.error(error);
 			if (error instanceof APIError) {

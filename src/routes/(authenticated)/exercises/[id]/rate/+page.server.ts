@@ -3,8 +3,7 @@ import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/db/schema';
-import * as fsrsSchema from '$lib/server/db/fsrs.schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { parseExercisePayload } from '$lib/exercise/parse-exercise';
 import { diffArrays } from 'diff';
 import { tokenize } from '$lib/correction/tokenize';
@@ -12,7 +11,14 @@ import { parseExerciseCheckPayload } from '$lib/exercise/parse-exercise-check';
 import { createFormResponders } from '$lib/forms/result.server';
 import { RATE_ID, rateFailure, rateSuccess } from '$lib/forms/rate';
 import * as z from 'zod';
-import { createEmptyCard, fsrs, Rating, type StepUnit, TypeConvert } from 'ts-fsrs';
+import {
+	createEmptyCard,
+	fsrs,
+	generatorParameters,
+	Rating,
+	type StepUnit,
+	TypeConvert
+} from 'ts-fsrs';
 import {
 	resolveNextNewExercises,
 	resolveNextPendingExercises,
@@ -42,7 +48,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				targetLanguage: schema.exercise.targetLanguage
 			})
 			.from(schema.exercise)
-			.innerJoin(schema.userProfile, eq(schema.exercise.userId, schema.userProfile.userId))
+			.innerJoin(schema.user, eq(schema.exercise.userId, schema.user.id))
 			.where(
 				and(
 					eq(schema.exercise.id, exerciseId),
@@ -120,26 +126,25 @@ export const actions = {
 			return rate.fail({ error: { code: 'invalid_input' }, status: 400 });
 		}
 
-		const userProfile = (
-			await db
-				.select({ timeZone: schema.userProfile.timeZone })
-				.from(schema.userProfile)
-				.where(eq(schema.userProfile.userId, signedInUser.id))
-		).at(0);
-
-		if (!userProfile) {
-			return redirect(303, '/login');
-		}
-
+		const fsrsParameters = generatorParameters();
 		const userSrsProfile = (
 			await db
-				.select({ algorithm: schema.userSrsProfile.algorithm, setup: schema.userSrsProfile.setup })
-				.from(schema.userSrsProfile)
-				.where(and(eq(schema.userSrsProfile.userId, signedInUser.id)))
-				.limit(1)
+				.insert(schema.userSrsProfile)
+				.values({ userId: signedInUser.id, algorithm: 'fsrs', setup: fsrsParameters })
+				.onConflictDoUpdate({
+					target: schema.userSrsProfile.userId,
+					set: {
+						algorithm: sql`${schema.userSrsProfile.algorithm}`,
+						setup: sql`${schema.userSrsProfile.setup}`
+					}
+				})
+				.returning({
+					algorithm: schema.userSrsProfile.algorithm,
+					setup: schema.userSrsProfile.setup
+				})
 		).at(0);
 
-		if (!userSrsProfile) return redirect(303, '/exercises');
+		if (!userSrsProfile) throw new Error('Failed to upsert SRS profile');
 
 		const exercise = (
 			await db
@@ -192,15 +197,15 @@ export const actions = {
 			const existingFsrsCard = (
 				await db
 					.select({
-						id: fsrsSchema.fsrsCard.id,
-						stateBlob: fsrsSchema.fsrsCard.stateBlob,
-						nextDueAt: fsrsSchema.fsrsCard.nextDueAt
+						id: schema.fsrsCard.id,
+						stateBlob: schema.fsrsCard.stateBlob,
+						nextDueAt: schema.fsrsCard.nextDueAt
 					})
-					.from(fsrsSchema.fsrsCard)
+					.from(schema.fsrsCard)
 					.where(
 						and(
-							eq(fsrsSchema.fsrsCard.userId, signedInUser.id),
-							eq(fsrsSchema.fsrsCard.exerciseId, exerciseId)
+							eq(schema.fsrsCard.userId, signedInUser.id),
+							eq(schema.fsrsCard.exerciseId, exerciseId)
 						)
 					)
 					.limit(1)
@@ -242,20 +247,20 @@ export const actions = {
 
 					const fsrsCard = (
 						await tx
-							.insert(fsrsSchema.fsrsCard)
+							.insert(schema.fsrsCard)
 							.values({
 								userId: signedInUser.id,
 								exerciseId: exerciseId,
 								stateBlob: recordLogItem.card,
 								nextDueAt: recordLogItem.card.due
 							})
-							.returning({ id: fsrsSchema.fsrsCard.id })
+							.returning({ id: schema.fsrsCard.id })
 					).at(0);
 
 					// This should never happen.
 					if (!fsrsCard) throw new Error('Failed to create FSRS card in database');
 
-					await tx.insert(fsrsSchema.fsrsReviewLog).values({
+					await tx.insert(schema.fsrsReviewLog).values({
 						userId: signedInUser.id,
 						fsrsCardId: fsrsCard.id,
 						reviewedAt: reviewDate,
@@ -272,16 +277,16 @@ export const actions = {
 					);
 
 					await tx
-						.update(fsrsSchema.fsrsCard)
+						.update(schema.fsrsCard)
 						.set({ stateBlob: recordLogItem.card, nextDueAt: recordLogItem.card.due })
 						.where(
 							and(
-								eq(fsrsSchema.fsrsCard.userId, signedInUser.id),
-								eq(fsrsSchema.fsrsCard.exerciseId, exerciseId)
+								eq(schema.fsrsCard.userId, signedInUser.id),
+								eq(schema.fsrsCard.exerciseId, exerciseId)
 							)
 						);
 
-					await tx.insert(fsrsSchema.fsrsReviewLog).values({
+					await tx.insert(schema.fsrsReviewLog).values({
 						userId: signedInUser.id,
 						fsrsCardId: existingFsrsCard.id,
 						reviewedAt: reviewDate,
@@ -305,7 +310,7 @@ export const actions = {
 		const nextPendingExercise = (
 			await resolveNextPendingExercises({
 				userId: signedInUser.id,
-				timeZone: userProfile.timeZone,
+				timeZone: signedInUser.timeZone,
 				reviewDate
 			})
 		).at(0);

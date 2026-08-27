@@ -11,7 +11,9 @@ export const user = pgTable('user', {
 	updatedAt: timestamp('updated_at')
 		.defaultNow()
 		.$onUpdate(() => /* @__PURE__ */ new Date())
-		.notNull()
+		.notNull(),
+	nativeLanguage: text('native_language', { enum: ['es', 'en'] }).notNull(),
+	timeZone: text('time_zone').notNull()
 });
 
 export const session = pgTable(
