@@ -10,6 +10,7 @@ import { generatorParameters } from 'ts-fsrs';
 import { createFormResponders } from '$lib/forms/result.server';
 import { SIGN_IN_ID, signInFailure, signInSuccess } from '$lib/forms/sign-in';
 import { SIGN_UP_ID, signUpFailure, signUpSuccess } from '$lib/forms/sign-up';
+import { requireUserSession } from '$lib/server/session-user';
 
 const signUpResponders = createFormResponders({
 	id: SIGN_UP_ID,
@@ -24,7 +25,8 @@ const signInResponders = createFormResponders({
 });
 
 export const load: PageServerLoad = async ({ locals }) => {
-	if (locals.user) return redirect(302, '/chats');
+	const signedInUser = requireUserSession(locals);
+	if (signedInUser) return redirect(302, '/chats');
 };
 
 export const actions = {
