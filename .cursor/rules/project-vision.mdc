@@ -1,32 +1,42 @@
 ---
-description: Meta del MVP — conversación, repaso de errores y retroalimentación
+description: Meta del MVP — producir, repasar errores y retroalimentación
 alwaysApply: true
 ---
 
 # Visión del producto (MVP)
 
-Este repo es un **MVP de asistente de idiomas**. La meta no es una app “bonita”: es **cerrar el ciclo de aprendizaje** con soluciones simples.
+Este repo es un **MVP de asistente de idiomas**. El ciclo de aprendizaje ya está cerrado: producir → capturar errores → repasar → ver en qué se sigue fallando. La meta ahora es **abrir cómo se produce**, con soluciones simples.
 
 ## Los tres pilares
 
-1. **Conversación** — El usuario chatea; el sistema responde y corrige. **Cubierto.**
+1. **Producción** — El usuario produce en el idioma objetivo; el sistema corrige y captura errores. Tres formas:
+   - **Chat libre** — Conversación sin tema. El sistema responde y corrige. **Cubierto.**
+   - **One-shot** — Corregir una oración aislada, sin conversación ni compañero. Mismos errores → ejercicios. **Por hacer.**
+   - **Situación** — Chat con contexto y meta visible (quién eres, quién es el otro, qué quieres). El usuario rolea; el NPC responde en personaje. **Por hacer.**
 2. **Repaso de errores** — Los errores se convierten en ejercicios de respuesta completa (**full answer**) y se repasan con **FSRS**. **Cubierto.**
-3. **Retroalimentación** — El usuario ve en qué se sigue equivocando. Los errores se capturan del **chat** y de los **repasos**. Un **resumen periódico** (semanal o mensual) basta; no hace falta un sistema de métricas.
+3. **Retroalimentación** — El usuario ve en qué se sigue equivocando. Los errores se capturan de **todas** las formas de producir y de los **repasos**. Un **resumen periódico** (semanal o mensual) basta; no hace falta un sistema de métricas.
+
+## Cómo es cada forma de producir
+
+**One-shot.** Pegar lo que ibas a escribir (WhatsApp, mail, Slack) y corregirlo. Sin reply, sin hilo. Si hace falta desambiguar, un campo opcional de intención en el idioma nativo. No es un chat mudo.
+
+**Situación.** Un par de escenarios **curados** (no los inventa el usuario todavía). La meta es **briefing**, no condición de victoria: se muestra y condiciona al NPC; nadie detecta si “se cumplió”. El usuario sale cuando quiere. El NPC puede asentar el turno (cerrar sin pregunta, sin inventar tema) o seguir empujando; si el usuario escribe de nuevo, contesta en personaje. No se queda mudo. El reply de situación no es el compañero amable del chat libre: puede resistirse, cortar o no ayudar.
 
 ## Prioridad para sugerencias de código y diseño
 
 Enfocar el trabajo en, y solo expandir dentro de, este anillo:
 
-- **Conversación**: iniciar y mantener el chat (flujo estable). No ampliar el alcance salvo que desbloquee el ciclo.
+- **Producción**: chat libre estable; one-shot; un puñado de situaciones curadas. Misma corrección → ejercicios. No ampliar el alcance salvo que desbloquee el ciclo.
 - **Repaso**: un solo tipo de ejercicio (**full answer**) + FSRS. No introducir otros formatos salvo que el usuario lo pida.
 - **Retroalimentación**: un resumen simple de errores recurrentes. Periodo flexible. Sin dashboards ni métricas sofisticadas.
 
 ## Lo que no es prioridad
 
 - **UI pulida** (tipografía, animaciones, layouts “de producto final”).
-- Features que no cierren el ciclo: conversar → repasar → ver en qué se sigue fallando.
+- Features que no cierren el ciclo: producir → repasar → ver en qué se sigue fallando.
 - Resolver de más: métricas finas, periodos rígidos, o analítica que no aporte al resumen.
+- **Situación más allá del POC**: hitos, juez LLM (`done` / “la meta se cumplió”), desafíos diarios, rachas, escenarios creados por el usuario. Eso puede venir después (el usuario rellenaría el mismo molde: quién eres, quién es el otro, la situación, qué quieres).
 
 ## Criterio de decisión
 
-Mantener la **simpleza**. No todo tiene que estar resuelto. Si una sugerencia no ayuda a **cerrar el ciclo de aprendizaje**, dejarla fuera. Preferir cambios pequeños que completen el camino de punta a punta.
+Mantener la **simpleza**. No todo tiene que estar resuelto. Si una sugerencia no ayuda a **cerrar el ciclo de aprendizaje** o a **producir de estas tres formas**, dejarla fuera. Preferir cambios pequeños que completen el camino de punta a punta.
