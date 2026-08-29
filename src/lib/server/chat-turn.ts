@@ -209,13 +209,6 @@ async function correctUserMessage({
 				stop: null
 			});
 
-			console.log('LLM Response', {
-				content: chatCompletion.choices.at(0)?.message.content,
-				reasoning: chatCompletion.choices.at(0)?.message.reasoning,
-				finish_reason: chatCompletion.choices.at(0)?.finish_reason,
-				usage: chatCompletion.usage
-			});
-
 			return parseLlmResponse(
 				chatCompletion.choices.at(0)?.message.content,
 				messageCorrectionOutputSchema
