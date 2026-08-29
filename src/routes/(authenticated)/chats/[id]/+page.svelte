@@ -57,11 +57,10 @@
 						Error al generar la respuesta
 					{/if}
 				</p>
-
 				{#if message.status === 'failed'}
-					<form method="post" action="?/retryReply" use:enhance={retryReply.enhance}>
+					<form class="retry" method="post" action="?/retryReply" use:enhance={retryReply.enhance}>
 						{#if retryReply.view.status === 'failure'}
-							<p>Error al reintentar</p>
+							<span>Error al reintentar</span>
 						{/if}
 						<button type="submit" disabled={retryReply.view.status === 'pending'}>
 							{retryReply.view.status === 'pending' ? 'Cargando' : 'Reintentar'}
@@ -72,16 +71,7 @@
 			</div>
 		{:else}
 			<div class="msg">
-				<p class="who">
-					Tú
-					{#if message.status === 'correcting'}
-						<span class="status">(Corrigiendo)</span>
-					{:else if message.status === 'failed'}
-						<span class="status">(Error)</span>
-					{:else if message.status === 'pending'}
-						<span class="status">(Pendiente)</span>
-					{/if}
-				</p>
+				<p class="who">Tú</p>
 
 				<p>
 					{#if message.status === 'complete'}
@@ -132,14 +122,21 @@
 					{/if}
 				</p>
 
-				{#if message.status === 'failed'}
-					<form method="post" action="?/retryCorrection" use:enhance={retryCorrection.enhance}>
-						{#if retryCorrection.view.status === 'failure'}
-							<p>Error al reintentar</p>
+				{#if message.status === 'correcting' || message.status === 'pending'}
+					<p class="note">Generando corrección…</p>
+				{:else if message.status === 'failed'}
+					<form
+						class="retry"
+						method="post"
+						action="?/retryCorrection"
+						use:enhance={retryCorrection.enhance}
+					>
+						{#if retryCorrection.view.status === 'pending'}
+							Generando corrección…
+						{:else}
+							<span>No se pudo generar la corrección.</span>
+							<button type="submit">Reintentar</button>
 						{/if}
-						<button type="submit" disabled={retryCorrection.view.status === 'pending'}>
-							{retryCorrection.view.status === 'pending' ? 'Cargando' : 'Reintentar'}
-						</button>
 						<input type="hidden" name="message_id" value={message.id} />
 					</form>
 				{/if}
@@ -207,6 +204,11 @@
 		margin: 0;
 	}
 
+	.msg .note,
+	.msg .retry {
+		margin-top: 0.3rem;
+	}
+
 	.who {
 		font-size: 0.7rem;
 		letter-spacing: 0.06em;
@@ -216,11 +218,26 @@
 		font-weight: 600;
 	}
 
-	.status {
-		font-weight: 400;
-		text-transform: none;
-		letter-spacing: 0;
-		margin-left: 0.35rem;
+	.note,
+	.retry {
+		margin: 0.3rem 0 0;
+		font-size: 0.85rem;
+		color: var(--muted);
+	}
+
+	.retry button {
+		background: none;
+		color: var(--muted);
+		border: none;
+		padding: 0;
+		font: inherit;
+		text-decoration: underline;
+		text-underline-offset: 0.18em;
+	}
+
+	.retry button:hover:not(:disabled) {
+		color: var(--ink);
+		background: none;
 	}
 
 	.corr-rm,

@@ -31,14 +31,14 @@
 
 <nav aria-label="Secciones">
 	<a href="/chats" aria-current={path.startsWith('/chats') ? 'page' : undefined}>Chats</a>
+	<a href="/one-shots" aria-current={path.startsWith('/one-shots') ? 'page' : undefined}>
+		Correcciones rápidas
+	</a>
 	<a href="/exercises" aria-current={path.startsWith('/exercises') ? 'page' : undefined}>
 		Ejercicios
 	</a>
 	<a href="/feedbacks" aria-current={path.startsWith('/feedbacks') ? 'page' : undefined}>
 		Retroalimentaciones
-	</a>
-	<a href="/one-shots" aria-current={path.startsWith('/one-shots') ? 'page' : undefined}>
-		One-shots
 	</a>
 </nav>
 
