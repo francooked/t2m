@@ -68,7 +68,8 @@ async function loadChat({ userId, chatId }: { userId: string; chatId: number }) 
 				id: schema.chat.id,
 				userId: schema.user.id,
 				nativeLanguage: schema.user.nativeLanguage,
-				targetLanguage: schema.chat.targetLanguage
+				targetLanguage: schema.chat.targetLanguage,
+				kind: schema.chat.kind
 			})
 			.from(schema.chat)
 			.innerJoin(schema.message, eq(schema.chat.id, schema.message.chatId))
@@ -83,6 +84,7 @@ async function loadChat({ userId, chatId }: { userId: string; chatId: number }) 
 		.select({
 			id: schema.message.id,
 			content: schema.message.content,
+			intent: schema.message.intent,
 			role: schema.message.role,
 			status: schema.message.status
 		})
@@ -90,12 +92,6 @@ async function loadChat({ userId, chatId }: { userId: string; chatId: number }) 
 		.innerJoin(schema.chat, eq(schema.message.chatId, schema.chat.id))
 		.where(and(eq(schema.chat.userId, userId), eq(schema.chat.id, chatId)))
 		.orderBy(schema.message.id);
-
-	// Even if the chat is new, there should be at least two messages: one user message and one assistant message.
-	// They are both pending.
-	if (messages.length < 2) {
-		throw new ChatTurnError('messages_not_found');
-	}
 
 	return { chat, messages };
 }
@@ -168,18 +164,13 @@ async function replyUserMessage({
 async function correctUserMessage({
 	chat,
 	messages,
-	userMessageId,
-	assistantMessageId
-}: { userMessageId: number; assistantMessageId: number } & Awaited<ReturnType<typeof loadChat>>) {
+	userMessageId
+}: { userMessageId: number } & Awaited<ReturnType<typeof loadChat>>) {
 	const userMessage = messages.find(
 		(message) => message.id === userMessageId && message.role === 'user'
 	);
 
-	const assistantMessage = messages.find(
-		(message) => message.id === assistantMessageId && message.role === 'assistant'
-	);
-
-	if (!userMessage || !assistantMessage) {
+	if (!userMessage) {
 		throw new ChatTurnError('messages_not_found');
 	}
 
@@ -216,6 +207,13 @@ async function correctUserMessage({
 				max_completion_tokens: 4096,
 				top_p: 1,
 				stop: null
+			});
+
+			console.log('LLM Response', {
+				content: chatCompletion.choices.at(0)?.message.content,
+				reasoning: chatCompletion.choices.at(0)?.message.reasoning,
+				finish_reason: chatCompletion.choices.at(0)?.finish_reason,
+				usage: chatCompletion.usage
 			});
 
 			return parseLlmResponse(
@@ -296,7 +294,7 @@ async function runMessageTask({
 	}
 }
 
-export async function processChatTurn({
+export async function processConversationTurn({
 	userId,
 	chatId,
 	userMessageId,
@@ -308,6 +306,27 @@ export async function processChatTurn({
 	assistantMessageId: number;
 }) {
 	const { chat, messages } = await loadChat({ userId, chatId });
+
+	if (chat.kind !== 'conversation') {
+		throw new ChatTurnError('chat_not_found');
+	}
+
+	// Even if the chat is new, there should be at least two messages: one user message and one assistant message.
+	// They are both pending.
+	const userMessageIndex = messages.findIndex(
+		({ id, role }) => id === userMessageId && role === 'user'
+	);
+
+	if (userMessageIndex === -1) {
+		throw new ChatTurnError('messages_not_found');
+	}
+
+	const assistantMessage = messages.at(userMessageIndex + 1);
+
+	if (assistantMessage?.id !== assistantMessageId || assistantMessage.role !== 'assistant') {
+		throw new ChatTurnError('messages_not_found');
+	}
+
 	await Promise.allSettled([
 		runMessageTask({
 			chatId,
@@ -317,9 +336,37 @@ export async function processChatTurn({
 		runMessageTask({
 			chatId,
 			messageId: userMessageId,
-			task: () => correctUserMessage({ chat, messages, assistantMessageId, userMessageId })
+			task: () => correctUserMessage({ chat, messages, userMessageId })
 		})
 	]);
+}
+
+export async function processOneShot({
+	userId,
+	chatId,
+	userMessageId
+}: {
+	userId: string;
+	chatId: number;
+	userMessageId: number;
+}) {
+	const { chat, messages } = await loadChat({ userId, chatId });
+
+	if (chat.kind !== 'one_shot') {
+		throw new ChatTurnError('chat_not_found');
+	}
+
+	const userMessage = messages.find(({ id, role }) => id === userMessageId && role === 'user');
+
+	if (!userMessage || messages.length !== 1) {
+		throw new ChatTurnError('messages_not_found');
+	}
+
+	await runMessageTask({
+		chatId,
+		messageId: userMessageId,
+		task: () => correctUserMessage({ chat, messages, userMessageId })
+	});
 }
 
 export async function retryReply({
@@ -362,15 +409,9 @@ export async function retryCorrection({
 	userMessageId: number;
 }) {
 	const { chat, messages } = await loadChat({ userId, chatId });
-	const userMessageIndex = messages.findIndex(({ id }) => id === userMessageId);
+	const userMessage = messages.find(({ id, role }) => id === userMessageId && role === 'user');
 
-	if (userMessageIndex === -1) {
-		throw new ChatTurnError('messages_not_found');
-	}
-
-	const assistantMessage = messages.at(userMessageIndex + 1);
-
-	if (assistantMessage?.role !== 'assistant') {
+	if (!userMessage) {
 		throw new ChatTurnError('messages_not_found');
 	}
 
@@ -381,8 +422,7 @@ export async function retryCorrection({
 			correctUserMessage({
 				chat,
 				messages,
-				userMessageId,
-				assistantMessageId: assistantMessage.id
+				userMessageId
 			})
 	});
 }

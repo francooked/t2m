@@ -296,3 +296,7 @@ Este café es [1:mejor] que el otro.
 El examén fue díficil
 El [1:examén] fue [2:díficil]
 El [1:examen] fue [2:difícil]
+
+# Curioso
+
+Por algún extraño motivo, la oración `quiero ir a donde sea` en el one-shot hace que falle SIEMPRE el prompt. ¿Cuál será la causa? ¿Asumir que hay una respuesta del LLM?

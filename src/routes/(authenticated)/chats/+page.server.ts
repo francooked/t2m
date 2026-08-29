@@ -7,7 +7,7 @@ import type { Actions } from './$types';
 import z from 'zod';
 import { LANGUAGE_CODES } from '$lib/constants';
 import { requireUserSession } from '$lib/server/session-user';
-import { processChatTurn } from '$lib/server/chat-turn';
+import { processConversationTurn } from '$lib/server/chat-turn';
 import { normalizeText } from '$lib/correction/normalize-text';
 import { createFormResponders } from '$lib/forms/result.server';
 import { START_CHAT_ID, startChatFailure, startChatSuccess } from '$lib/forms/start-chat';
@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const chats = await db
 		.select({ id: schema.chat.id, title: schema.chat.title })
 		.from(schema.chat)
-		.where(eq(schema.chat.userId, signedInUser.id));
+		.where(and(eq(schema.chat.userId, signedInUser.id), eq(schema.chat.kind, 'conversation')));
 
 	return { chats };
 };
@@ -68,6 +68,7 @@ export const actions = {
 				await tx
 					.insert(schema.chat)
 					.values({
+						kind: 'conversation',
 						targetLanguage: data.targetLanguage,
 						title: data.content.slice(0, 64),
 						userId: signedInUser.id
@@ -98,7 +99,7 @@ export const actions = {
 		});
 
 		try {
-			await processChatTurn({
+			await processConversationTurn({
 				userId: signedInUser.id,
 				chatId: newChat.id,
 				userMessageId: newUserMessage.id,

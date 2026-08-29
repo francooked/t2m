@@ -12,7 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { isNull } from 'drizzle-orm';
 import { user } from './auth.schema';
-import { LANGUAGE_CODES, MESSAGE_STATUS, ROLES, SRS_ALGORITHMS } from '$lib/constants';
+import { CHAT_KIND, LANGUAGE_CODES, MESSAGE_STATUS, ROLES, SRS_ALGORITHMS } from '$lib/constants';
 import type { ExercisePayload } from '$lib/exercise/exercise-payload';
 import type { ExerciseCheckPayload } from '$lib/exercise/exercise-check-payload';
 import type { FeedbackPayloadSchema } from '$lib/feedback/feedback-payload';
@@ -21,6 +21,7 @@ export const languageCodeEnum = pgEnum('language_code', LANGUAGE_CODES);
 export const messageRoleEnum = pgEnum('message_role', ROLES);
 export const messageStatusEnum = pgEnum('message_status', MESSAGE_STATUS);
 export const srsAlgorithmEnum = pgEnum('srs_algorithm', SRS_ALGORITHMS);
+export const chatKindEnum = pgEnum('chat_kind', CHAT_KIND);
 
 export const userSrsProfile = pgTable('user_srs_profile', {
 	userId: text('user_id')
@@ -39,6 +40,7 @@ export const chat = pgTable(
 			.notNull(),
 		targetLanguage: languageCodeEnum('target_language').notNull(),
 		title: text('title').notNull(),
+		kind: chatKindEnum('kind').notNull(),
 		createdAt: timestamp('created_at').defaultNow().notNull(),
 		updatedAt: timestamp('updated_at')
 			.defaultNow()
@@ -57,6 +59,7 @@ export const message = pgTable(
 			.notNull(),
 		role: messageRoleEnum('role').notNull(),
 		content: text('content').notNull(),
+		intent: text('intent'),
 		status: messageStatusEnum('status').notNull(),
 		createdAt: timestamp('created_at').defaultNow().notNull()
 	},

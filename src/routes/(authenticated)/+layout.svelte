@@ -37,6 +37,9 @@
 	<a href="/feedbacks" aria-current={path.startsWith('/feedbacks') ? 'page' : undefined}>
 		Retroalimentaciones
 	</a>
+	<a href="/one-shots" aria-current={path.startsWith('/one-shots') ? 'page' : undefined}>
+		One-shots
+	</a>
 </nav>
 
 <main>

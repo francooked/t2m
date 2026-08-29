@@ -5,7 +5,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { redirect } from '@sveltejs/kit';
 import z from 'zod';
 import { requireUserSession } from '$lib/server/session-user';
-import { processChatTurn, retryCorrection, retryReply } from '$lib/server/chat-turn';
+import { processConversationTurn, retryCorrection, retryReply } from '$lib/server/chat-turn';
 import { normalizeText } from '$lib/correction/normalize-text';
 import { buildBlame } from '$lib/correction/build-blame';
 import { traceRewriteHistory, type Segment } from '$lib/correction/segments';
@@ -72,7 +72,13 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		await db
 			.select({ id: schema.chat.id, targetLanguage: schema.chat.targetLanguage })
 			.from(schema.chat)
-			.where(and(eq(schema.chat.id, chatId), eq(schema.chat.userId, signedInUser.id)))
+			.where(
+				and(
+					eq(schema.chat.id, chatId),
+					eq(schema.chat.userId, signedInUser.id),
+					eq(schema.chat.kind, 'conversation')
+				)
+			)
 	).at(0);
 
 	if (!chat) {
@@ -210,7 +216,7 @@ export const actions = {
 		}
 
 		try {
-			await processChatTurn({
+			await processConversationTurn({
 				userId: signedInUser.id,
 				chatId: chat.id,
 				userMessageId: newUserMessage.id,

@@ -23,3 +23,4 @@ export const MESSAGE_STATUS = [
 ] as const;
 export const SRS_ALGORITHMS = ['fsrs'] as const;
 export const FSRS_RATINGS = ['again', 'hard', 'good', 'easy'] as const;
+export const CHAT_KIND = ['conversation', 'one_shot'] as const;
