@@ -1,0 +1,80 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+
+description: 'Error patterns'
+
+evaluateOptions:
+  maxConcurrency: 1
+
+prompts:
+  - file://prompt.ts
+
+providers:
+  - id: groq:openai/gpt-oss-20b
+    config:
+      temperature: 0
+      top_p: 1
+      stop: null
+      max_completion_tokens: 2048
+      reasoning_effort: 'low'
+      include_reasoning: true
+
+tests:
+  - description: 'en: past tense, negation, and agreement from chat mistakes'
+    vars:
+      nativeLanguage: es
+      targetLanguage: en
+      mistakes:
+        - wrote: I have go to the party yesterday and we dancing all night
+          instead: I went to the party yesterday and we danced all night
+          note: '"yesterday" pide pasado: "went" y "danced", no "have go" ni "dancing".'
+        - wrote: Yesterday my student no understand the lesson so I explain again
+          instead: Yesterday my student did not understand the lesson so I explained again
+          note: 'En pasado, la negación va con "did not" y el verbo en pasado: "explained".'
+        - wrote: She have two cat and they is very playful
+          instead: She has two cats and they are very playful
+          note: 'Con "she" el verbo es "has"; "cat" plural "cats"; "they" lleva "are".'
+
+  - description: 'en: present perfect with since, and explain to me'
+    vars:
+      nativeLanguage: es
+      targetLanguage: en
+      mistakes:
+        - wrote: I live here since 2019
+          instead: I have lived here since 2019
+          note: 'Con "since" se usa presente perfecto: "have lived".'
+        - wrote: I know him since the school
+          instead: I have known him since school
+          note: '"since" pide presente perfecto: "have known".'
+        - wrote: Can you explain me the homework
+          instead: Can you explain the homework to me
+          note: '"explain" no lleva objeto de persona pegado: "explain X to me".'
+
+  - description: 'es: past tense, gustar, and personal a'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      mistakes:
+        - wrote: Yo comprar dos libro nuevo la semana pasado
+          instead: Yo compré dos libros nuevos la semana pasada
+          note: 'Need past tense "compré", plural "libros nuevos", and feminine "pasada".'
+        - wrote: Yo gustaría ir chile este verano
+          instead: Me gustaría ir a Chile este verano
+          note: '"gustar" takes "me gustaría", and "ir" needs "a" before a country.'
+        - wrote: No conozco nadie en la fiesta
+          instead: No conozco a nadie en la fiesta
+          note: '"conocer" needs "a" before a person, also with "nadie".'
+
+  - description: 'es: accent, agreement, and en vs a'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      mistakes:
+        - wrote: Lo planee la año pasado
+          instead: Lo planeé el año pasado
+          note: '"planeé" needs the accent, and "año" is masculine: "el año pasado".'
+        - wrote: Mis hermana son muy alto y trabaja en un hospital
+          instead: Mi hermana es muy alta y trabaja en un hospital
+          note: 'One sister is singular "mi hermana es", and "alta" is feminine.'
+        - wrote: Estoy aburrido a esta fiesta
+          instead: Estoy aburrido en esta fiesta
+          note: 'Use "en" for being inside a place, not "a".'
