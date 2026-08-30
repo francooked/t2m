@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+
+description: 'Translation feedback'
+
+evaluateOptions:
+  maxConcurrency: 1
+
+prompts:
+  - file://prompt.ts
+
+providers:
+  - id: groq:openai/gpt-oss-20b
+    config:
+      temperature: 0
+      top_p: 1
+      stop: null
+      max_completion_tokens: 2048
+      reasoning_effort: 'low'
+      include_reasoning: true
+
+tests:
+  - description: 'es: accent and article gender in "el año pasado"'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      original: I planned it last year
+      expected: Lo planeé el año pasado
+      answer: Lo planee la año pasado
+
+  - description: "en: subject-verb agreement in a don't / studies pair"
+    vars:
+      nativeLanguage: es
+      targetLanguage: en
+      original: Ella no trabaja, estudia en la universidad
+      expected: She doesn't work, she studies at university
+      answer: She don't work, she study at university

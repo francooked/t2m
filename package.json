@@ -27,6 +27,7 @@
 		"auth:schema": "npx auth@latest generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes",
 		"eval:correction": "promptfoo eval -c promptfoo/message-correction/promptfooconfig.yaml --env-file .env --delay 1024",
 		"eval:reply": "promptfoo eval -c promptfoo/conversation-reply/promptfooconfig.yaml --env-file .env --delay 1024",
+		"eval:feedback": "promptfoo eval -c promptfoo/translation-feedback/promptfooconfig.yaml --env-file .env --delay 1024",
 		"eval:view": "promptfoo view"
 	},
 	"devDependencies": {
