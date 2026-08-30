@@ -17,14 +17,192 @@ providers:
       top_p: 1
       stop: null
       max_completion_tokens: 2048
+      reasoning_effort: 'low'
       include_reasoning: true
-      reasoning:
-        effort: low
 
 tests:
-  - vars:
+  # Already-correct messages: the corrector should return no steps.
+  - description: 'es: "a donde sea" is a valid phrase'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      turns:
+        - role: user
+          content: Quiero practicar para mi viaje
+        - role: assistant
+          content: ¿Ya sabes a qué país vas?
+        - role: user
+          content: quiero ir a donde sea
+
+  - description: 'es: "adonde sea" written as one word is also valid'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      turns:
+        - role: user
+          content: Quiero practicar para mi viaje
+        - role: assistant
+          content: ¿Ya sabes a qué país vas?
+        - role: user
+          content: quiero ir adonde sea
+
+  - description: 'es: "donde sea" without the preposition is also valid'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      turns:
+        - role: user
+          content: Quiero practicar para mi viaje
+        - role: assistant
+          content: ¿Ya sabes a qué país vas?
+        - role: user
+          content: me da igual, voy donde sea
+
+  - description: 'es: "no me queda otra" is idiomatic'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      turns:
+        - role: user
+          content: Tengo que trabajar el sábado
+        - role: assistant
+          content: ¿No puedes cambiarlo?
+        - role: user
+          content: no me queda otra, el proyecto se entrega el lunes
+
+  - description: 'es: subjunctive after "da igual que"'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      turns:
+        - role: user
+          content: ¿Salimos mañana?
+        - role: assistant
+          content: ¿Y si llueve?
+        - role: user
+          content: da igual que llueva, igual salimos
+
+  - description: 'es: "quizás" plus subjunctive'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      turns:
+        - role: user
+          content: Estoy pensando en ir al sur
+        - role: assistant
+          content: ¿Cuándo te irías?
+        - role: user
+          content: quizás vaya la próxima semana
+
+  - description: 'es: "hubiese" instead of "hubiera"'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      turns:
+        - role: user
+          content: Llegué tarde a la reunión
+        - role: assistant
+          content: ¿Qué pasó?
+        - role: user
+          content: si hubiese sabido que era a las ocho, habría salido antes
+
+  - description: 'es: dative "se me hizo tarde"'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      turns:
+        - role: user
+          content: Perdón por la demora
+        - role: assistant
+          content: ¿Todo bien?
+        - role: user
+          content: sí, se me hizo tarde en el trabajo
+
+  - description: 'es: one-shot with no chat context'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      turns:
+        - role: user
+          content: por mí, lo que sea
+
+  - description: 'en: "i don''t feel like" is idiomatic and the lowercase start is fine'
+    vars:
       nativeLanguage: es
       targetLanguage: en
       turns:
         - role: user
-          content: Yesterday I go to the store
+          content: I had a rough week
+        - role: assistant
+          content: Any plans for the weekend?
+        - role: user
+          content: i don't feel like going out tonight
+
+  - description: 'en: "whatever works for you" is idiomatic'
+    vars:
+      nativeLanguage: es
+      targetLanguage: en
+      turns:
+        - role: user
+          content: Should we meet at six or seven?
+        - role: assistant
+          content: Either works for me. You pick.
+        - role: user
+          content: whatever works for you is fine
+
+  - description: 'en: one-shot with no chat context'
+    vars:
+      nativeLanguage: es
+      targetLanguage: en
+      turns:
+        - role: user
+          content: i ended up staying home all weekend
+
+  # Messages with real errors.
+  - description: 'es: tense, plural and gender'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      turns:
+        - role: user
+          content: Quiero contarte de mi fin de semana
+        - role: assistant
+          content: ¡Cuéntame! ¿Qué hiciste?
+        - role: user
+          content: Yo comprar dos libro nuevo la semana pasado
+
+  - description: 'es: "ser" instead of "estar" for a passing state'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      turns:
+        - role: user
+          content: ¿Cómo está tu amiga?
+        - role: assistant
+          content: Cuéntame de ella, ¿qué ha estado haciendo?
+        - role: user
+          content: Mi amiga es cansada porque ella trabajó mucho ayer
+
+  - description: 'en: subject-verb agreement and plural'
+    vars:
+      nativeLanguage: es
+      targetLanguage: en
+      turns:
+        - role: user
+          content: Do you like animals?
+        - role: assistant
+          content: I do! Do you have any pets?
+        - role: user
+          content: She have two cat and they is very playful
+
+  - description: 'en: past tense with "yesterday"'
+    vars:
+      nativeLanguage: es
+      targetLanguage: en
+      turns:
+        - role: user
+          content: Hi, I want to talk about last weekend
+        - role: assistant
+          content: Sure, what did you do?
+        - role: user
+          content: I have go to the party yesterday and we dancing all night
