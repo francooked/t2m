@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+
+# Learn more about building a configuration: https://promptfoo.dev/docs/configuration/guide
+
+description: 'Message correction'
+
+evaluateOptions:
+  maxConcurrency: 1
+
+prompts:
+  - file://prompt.ts
+
+providers:
+  - id: groq:openai/gpt-oss-20b
+    config:
+      temperature: 0
+      top_p: 1
+      stop: null
+      max_completion_tokens: 2048
+      include_reasoning: true
+      reasoning:
+        effort: low
+
+tests:
+  - vars:
+      nativeLanguage: es
+      targetLanguage: en
+      turns:
+        - role: user
+          content: Yesterday I go to the store

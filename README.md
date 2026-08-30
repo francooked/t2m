@@ -29,6 +29,19 @@ npm run dev
 npm run dev -- --open
 ```
 
+Copy `.env.example` to `.env` and set `GROQ_API_KEY` (and the rest). The app and the prompt evals both read that file.
+
+## Prompt evals
+
+Promptfoo runs the real `buildPrompt` from `src/lib/prompts/` against Groq. Cases live next to each prompt under `promptfoo/`.
+
+```sh
+npm run eval:correction
+npm run eval:view
+```
+
+`eval:view` opens the local history for every eval, not just correction. Needs `GROQ_API_KEY` in `.env`. Details: `promptfoo/message-correction/README.md`.
+
 ## Building
 
 To create a production version of your app:
