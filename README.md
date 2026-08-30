@@ -37,10 +37,11 @@ Promptfoo runs the real `buildPrompt` from `src/lib/prompts/` against Groq. Case
 
 ```sh
 npm run eval:correction
+npm run eval:reply
 npm run eval:view
 ```
 
-`eval:view` opens the local history for every eval, not just correction. Needs `GROQ_API_KEY` in `.env`. Details: `promptfoo/message-correction/README.md`.
+`eval:view` opens the local history for every eval, not just one prompt. Needs `GROQ_API_KEY` in `.env`. Details: `promptfoo/message-correction/README.md` and `promptfoo/conversation-reply/README.md`.
 
 ## Building
 
