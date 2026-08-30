@@ -12,11 +12,19 @@ import {
 	languageName,
 	selectExamples,
 	takeLastTurns,
+	type LanguageCode,
 	type LanguagePair
 } from './utils';
 
 // How many turns of context the corrector sees. Only the last user message is corrected.
 const CONTEXT_TURNS = 3;
+
+// Forms the target language accepts side by side. Without these the model treats a valid
+// variant as an error, cannot produce a rewrite that differs from the original, and loops.
+const FREE_VARIANTS: Record<LanguageCode, string> = {
+	es: '"a donde" y "adonde", "quizá" y "quizás", "hubiera" y "hubiese", "lo quiero hacer" y "quiero hacerlo"',
+	en: '"toward" y "towards", "learned" y "learnt", "cannot" y "can not", el "that" opcional en "I think (that) she left"'
+};
 
 export const inputSchema = z
 	.object({
@@ -31,19 +39,27 @@ export const inputSchema = z
 		);
 	});
 
-export const outputSchema = z.object({
-	steps: z.array(
-		z.object({
-			sentence: z
-				.string()
-				.trim()
-				.min(1)
-				.transform((sentence) => normalizeText(sentence)),
-			reason: z.string().min(1)
-		})
-	),
-	translation: z.string().min(1)
-});
+export const outputSchema = z
+	.object({
+		steps: z.array(
+			z.object({
+				sentence: z
+					.string()
+					.trim()
+					.min(1)
+					.transform((sentence) => normalizeText(sentence)),
+				reason: z.string().min(1)
+			})
+		),
+		translation: z.string().min(1)
+	})
+	// A step that repeats the previous sentence fixed nothing. It means the model insisted on
+	// finding an error it could not name instead of answering with an empty list.
+	.refine(
+		({ steps }) =>
+			steps.every((step, index) => index === 0 || step.sentence !== steps[index - 1].sentence),
+		{ error: 'every step must change the sentence it comes from' }
+	);
 
 export type Input = z.infer<typeof inputSchema>;
 export type Output = z.infer<typeof outputSchema>;
@@ -105,6 +121,21 @@ export const examples: Example[] = [
 			nativeLanguage: 'en',
 			targetLanguage: 'es',
 			turns: [
+				{ role: 'user', content: 'Te aviso cuando llegue' },
+				{ role: 'assistant', content: '¿No es muy tarde para llamarte?' },
+				{ role: 'user', content: 'llámame cuando sea, no hay problema' }
+			]
+		},
+		output: {
+			steps: [],
+			translation: 'Call me whenever, it is not a problem'
+		}
+	},
+	{
+		input: {
+			nativeLanguage: 'en',
+			targetLanguage: 'es',
+			turns: [
 				{ role: 'user', content: 'Quiero hablar de viajes' },
 				{ role: 'assistant', content: '¿A dónde te gustaría viajar?' },
 				{ role: 'user', content: 'Yo gustaría ir chile este verano' }
@@ -122,7 +153,7 @@ export const examples: Example[] = [
 				},
 				{
 					sentence: 'Me gustaría ir a Chile este verano',
-					reason: 'country names are capitalized'
+					reason: 'in Spanish, country names always start with a capital letter'
 				}
 			],
 			translation: 'I would like to go to Chile this summer'
@@ -214,10 +245,25 @@ export const examples: Example[] = [
 				},
 				{
 					sentence: 'Yes, I planned it last year',
-					reason: '"last year" no lleva "the"'
+					reason: 'la expresión "last year" va sin "the" delante'
 				}
 			],
 			translation: 'Sí, lo planeé el año pasado'
+		}
+	},
+	{
+		input: {
+			nativeLanguage: 'es',
+			targetLanguage: 'en',
+			turns: [
+				{ role: 'user', content: 'I had a rough week at work' },
+				{ role: 'assistant', content: 'Any plans to unwind this weekend?' },
+				{ role: 'user', content: "i'd rather stay in and watch something" }
+			]
+		},
+		output: {
+			steps: [],
+			translation: 'Prefiero quedarme en casa y ver algo'
 		}
 	},
 	{
@@ -278,11 +324,11 @@ export const examples: Example[] = [
 			steps: [
 				{
 					sentence: "i don't know what to say honestly what do you think",
-					reason: '"dont" necesita apóstrofo: "don\'t"'
+					reason: 'las contracciones llevan apóstrofo: "dont" se escribe "don\'t"'
 				},
 				{
-					sentence: "I don't know what to say, honestly. What do you think?",
-					reason: 'faltan mayúsculas y puntuación para separar las ideas'
+					sentence: "i don't know what to say, honestly. What do you think?",
+					reason: 'sin coma ni punto las dos ideas quedan pegadas y cuesta leerlas'
 				}
 			],
 			translation: 'No sé qué decir, honestamente. ¿Tú qué piensas?'
@@ -314,7 +360,20 @@ const buildSystemPrompt = ({ nativeLanguage, targetLanguage }: LanguagePair): st
 
 		${buildLanguageRules({ nativeLanguage, targetLanguage })}
 
-		Devuelves "steps": una secuencia de reescrituras que va del mensaje original a una versión que suena natural en ${target}, cambiando lo mínimo necesario.
+		Tu primera decisión es si hay algo que corregir.
+		- Si el mensaje no rompe ninguna regla de ${target}, "steps" es una lista vacía y terminaste. Es el caso más común: la mayoría de los mensajes ya están bien.
+		- Si rompe alguna, "steps" son las reescrituras que la arreglan, cambiando lo mínimo necesario.
+
+		Ante la duda, "steps" va vacío. Corregir algo que ya estaba bien confunde al usuario más que dejar pasar un error.
+
+		Nada de esto es un error, y con esto "steps" va vacío:
+		- ${target} admite varias formas y el usuario eligió una: ${FREE_VARIANTS[targetLanguage]}. Si la forma que escribió existe, déjala.
+		- Una expresión hecha o coloquial que en ${target} se dice así, aunque palabra por palabra suene raro.
+		- Algo que tú dirías de otra manera. Tu preferencia no es un error.
+		- El punto final, la mayúscula inicial y las comas opcionales: en un chat no se exigen. No los agregues ni los quites.
+		- Un mensaje corto, informal o sin sujeto explícito, si se entiende con los turnos anteriores.
+
+		Sí corrige lo que cambia la lectura: ¿?, ¡!, tildes que distinguen dos palabras, apóstrofos, y la separación cuando dos ideas independientes quedan pegadas sin coma ni punto. Si separas con punto, la palabra que sigue va con mayúscula; la primera del mensaje no.
 
 		Qué es un paso:
 		- Un paso arregla UN problema del mensaje, nada más.
@@ -324,7 +383,8 @@ const buildSystemPrompt = ({ nativeLanguage, targetLanguage }: LanguagePair): st
 		- Nunca juntes en un paso un problema de verbo con uno de concordancia. Si el mensaje tiene tres problemas, entrega tres pasos.
 		- Un paso toca UNA sola frase: el grupo de palabras alrededor de un mismo sustantivo o de un mismo verbo. Si los cambios de un paso caen en dos frases distintas, divídelo en dos pasos.
 		- "sentence" es el texto del paso anterior con ese único problema arreglado. Todo lo demás queda EXACTAMENTE igual, incluidos los errores que corriges en pasos siguientes.
-		- Los pasos intermedios pueden seguir teniendo errores. Solo el último paso debe estar correcto y natural.
+		- Cada paso cambia algo: su "sentence" nunca puede ser idéntica al texto del que viene. Si ibas a escribir un paso y te queda igual que el mensaje original, es que no había error: devuelve "steps" vacío.
+		- Los pasos intermedios pueden seguir teniendo errores. Solo el último paso debe estar correcto.
 
 		Orden de los pasos, de mayor a menor impacto:
 		1. Lo que impide entender la idea: verbo, tiempo verbal, estructura, palabra equivocada.
@@ -339,22 +399,14 @@ const buildSystemPrompt = ({ nativeLanguage, targetLanguage }: LanguagePair): st
 
 		Límites:
 		- No cambies el significado ni el tono, y no agregues información que el usuario no escribió.
-		- Si el mensaje ya es correcto y natural, "steps" es una lista vacía. No inventes cambios de estilo.
-		- Si algo se puede decir de otra forma pero no rompe ninguna regla del idioma, déjalo tal cual: tu preferencia personal no es un error.
-		- En un chat, el punto final, la mayúscula inicial y las comas opcionales no son errores: no los agregues ni los quites. Sí corrige lo que cambia la lectura (¿?, ¡!, tildes, apóstrofos).
 		- Los mensajes anteriores son solo contexto: nunca los corrijas.
 		- Máximo 5 pasos. Si hay más problemas, junta todos los cosméticos en un solo paso final.
+		- Cada "sentence" está en ${target}. Cada "reason" y la "translation" están en ${native}, sin una sola palabra del otro idioma fuera de comillas.
 
 		"translation": traducción a ${native} de la versión final corregida (o del mensaje original si no hubo cambios).
 
-		Responde SOLO con este JSON:
+		Responde con este JSON y nada más. Escríbelo una sola vez, de corrido, sin volver atrás:
 		{"steps":[{"sentence":"...","reason":"..."}],"translation":"..."}
-
-		Antes de responder, revisa:
-		- Cada "sentence" está en ${target}; cada "reason" y "translation" están completos en ${native}, sin una sola palabra del otro idioma fuera de comillas.
-		- Cada paso cambia las palabras de un solo problema, dentro de una sola frase: si un paso mezcla dos problemas, sepáralo en dos pasos.
-		- Ningún paso agrega puntuación ni mayúsculas por estilo.
-		Si algo falla, reescribe la respuesta.
 	`;
 };
 

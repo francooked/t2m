@@ -201,10 +201,11 @@ async function correctUserMessage({
 						strict: false
 					}
 				},
+				reasoning_effort: 'low',
 				model: 'openai/gpt-oss-20b',
 				// Correcting is a deterministic task: sampling only adds inconsistent groupings.
 				temperature: 0,
-				max_completion_tokens: 4096,
+				max_completion_tokens: 2048,
 				top_p: 1,
 				stop: null
 			});
