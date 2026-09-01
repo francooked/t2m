@@ -3,7 +3,7 @@
 description: 'Translation feedback'
 
 evaluateOptions:
-  maxConcurrency: 1
+  maxConcurrency: 4
 
 prompts:
   - file://prompt.ts

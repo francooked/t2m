@@ -5,7 +5,7 @@
 description: 'Message correction'
 
 evaluateOptions:
-  maxConcurrency: 1
+  maxConcurrency: 4
 
 prompts:
   - file://prompt.ts
@@ -19,6 +19,9 @@ providers:
 tests:
   # Already-correct messages: the corrector should return no steps.
   - description: 'es: "a donde sea" is a valid phrase'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
     vars:
       nativeLanguage: en
       targetLanguage: es
@@ -31,6 +34,9 @@ tests:
           content: quiero ir a donde sea
 
   - description: 'es: "adonde sea" written as one word is also valid'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
     vars:
       nativeLanguage: en
       targetLanguage: es
@@ -43,6 +49,9 @@ tests:
           content: quiero ir adonde sea
 
   - description: 'es: "donde sea" without the preposition is also valid'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
     vars:
       nativeLanguage: en
       targetLanguage: es
@@ -55,6 +64,9 @@ tests:
           content: me da igual, voy donde sea
 
   - description: 'es: "no me queda otra" is idiomatic'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
     vars:
       nativeLanguage: en
       targetLanguage: es
@@ -67,6 +79,9 @@ tests:
           content: no me queda otra, el proyecto se entrega el lunes
 
   - description: 'es: subjunctive after "da igual que"'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
     vars:
       nativeLanguage: en
       targetLanguage: es
@@ -79,6 +94,9 @@ tests:
           content: da igual que llueva, igual salimos
 
   - description: 'es: "quizás" plus subjunctive'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
     vars:
       nativeLanguage: en
       targetLanguage: es
@@ -91,6 +109,9 @@ tests:
           content: quizás vaya la próxima semana
 
   - description: 'es: "hubiese" instead of "hubiera"'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
     vars:
       nativeLanguage: en
       targetLanguage: es
@@ -103,6 +124,9 @@ tests:
           content: si hubiese sabido que era a las ocho, habría salido antes
 
   - description: 'es: dative "se me hizo tarde"'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
     vars:
       nativeLanguage: en
       targetLanguage: es
@@ -115,6 +139,9 @@ tests:
           content: sí, se me hizo tarde en el trabajo
 
   - description: 'es: one-shot with no chat context'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
     vars:
       nativeLanguage: en
       targetLanguage: es
@@ -123,6 +150,9 @@ tests:
           content: por mí, lo que sea
 
   - description: 'en: "i don''t feel like" is idiomatic and the lowercase start is fine'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
     vars:
       nativeLanguage: es
       targetLanguage: en
@@ -135,6 +165,9 @@ tests:
           content: i don't feel like going out tonight
 
   - description: 'en: "whatever works for you" is idiomatic'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
     vars:
       nativeLanguage: es
       targetLanguage: en
@@ -147,6 +180,9 @@ tests:
           content: whatever works for you is fine
 
   - description: 'en: one-shot with no chat context'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
     vars:
       nativeLanguage: es
       targetLanguage: en
@@ -156,6 +192,9 @@ tests:
 
   # Messages with real errors.
   - description: 'es: tense, plural and gender'
+    assert:
+      - type: javascript
+        value: 'output.steps.length > 0'
     vars:
       nativeLanguage: en
       targetLanguage: es
@@ -168,6 +207,9 @@ tests:
           content: Yo comprar dos libro nuevo la semana pasado
 
   - description: 'es: "ser" instead of "estar" for a passing state'
+    assert:
+      - type: javascript
+        value: 'output.steps.length > 0'
     vars:
       nativeLanguage: en
       targetLanguage: es
@@ -180,6 +222,9 @@ tests:
           content: Mi amiga es cansada porque ella trabajó mucho ayer
 
   - description: 'en: subject-verb agreement and plural'
+    assert:
+      - type: javascript
+        value: 'output.steps.length > 0'
     vars:
       nativeLanguage: es
       targetLanguage: en
@@ -192,6 +237,9 @@ tests:
           content: She have two cat and they is very playful
 
   - description: 'en: past tense with "yesterday"'
+    assert:
+      - type: javascript
+        value: 'output.steps.length > 0'
     vars:
       nativeLanguage: es
       targetLanguage: en

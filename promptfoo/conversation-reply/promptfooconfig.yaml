@@ -3,7 +3,7 @@
 description: 'Conversation reply'
 
 evaluateOptions:
-  maxConcurrency: 1
+  maxConcurrency: 4
 
 prompts:
   - file://prompt.ts
