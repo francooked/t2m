@@ -182,6 +182,7 @@ async function correctUserMessage({
 				messages: buildMessageCorrectionPrompt({
 					nativeLanguage: chat.nativeLanguage,
 					targetLanguage: chat.targetLanguage,
+					intent: userMessage.intent ?? undefined,
 					turns: messages
 						.filter((message) => message.id <= userMessage.id)
 						.map(({ role, content }) => ({ role, content }))

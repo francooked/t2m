@@ -250,3 +250,66 @@ tests:
           content: Sure, what did you do?
         - role: user
           content: I have go to the party yesterday and we dancing all night
+
+  # Messages with an intent: it disambiguates, it is not a text to translate.
+  - description: 'es: intent exposes a false friend ("soportar" is not "to support")'
+    assert:
+      - type: javascript
+        value: 'output.steps.length > 0 && /apoy/i.test(output.steps.at(-1).sentence)'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      intent: I want to say I support your decision to change jobs
+      turns:
+        - role: user
+          content: Soporto tu decisión de cambiar de trabajo
+
+  # Same sentence, no intent: it is valid Spanish, so nothing to correct.
+  - description: 'es: without an intent, "soporto tu decisión" is left alone'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      turns:
+        - role: user
+          content: Soporto tu decisión de cambiar de trabajo
+
+  - description: 'es: intent says more than the message, but the message is correct'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
+    vars:
+      nativeLanguage: en
+      targetLanguage: es
+      intent: I want to ask my coworker if she can send me the report before Friday, because the
+        client has been waiting for it all week
+      turns:
+        - role: user
+          content: ¿Me puedes mandar el reporte antes del viernes?
+
+  - description: 'en: intent exposes a false friend ("constipated" is not "resfriado")'
+    assert:
+      - type: javascript
+        value: 'output.steps.length > 0 && !/constipated/i.test(output.steps.at(-1).sentence)'
+    vars:
+      nativeLanguage: es
+      targetLanguage: en
+      intent: Quiero avisar que estoy resfriado y que no iré a la oficina
+      turns:
+        - role: user
+          content: I am constipated and I will not go to the office
+
+  - description: 'en: intent says more than the message, but the message is correct'
+    assert:
+      - type: javascript
+        value: 'output.steps.length === 0'
+    vars:
+      nativeLanguage: es
+      targetLanguage: en
+      intent: Quiero decirle a mi equipo que terminé la tarea y que subí los cambios al repositorio,
+        y que pueden revisarlos cuando quieran
+      turns:
+        - role: user
+          content: i finished the task and pushed the changes

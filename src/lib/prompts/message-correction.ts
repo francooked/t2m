@@ -31,6 +31,9 @@ export const inputSchema = z
 	.object({
 		nativeLanguage: z.enum(LANGUAGE_CODES),
 		targetLanguage: z.enum(LANGUAGE_CODES),
+		// What the user meant to say, written in their native language. Optional: only some
+		// messages carry it, and it exists to disambiguate the last user message.
+		intent: z.string().trim().min(1).optional(),
 		turns: z.array(z.object({ role: z.enum(['assistant', 'user']), content: z.string() }))
 	})
 	.refine(({ nativeLanguage, targetLanguage, turns }) => {
@@ -82,6 +85,7 @@ export const buildFewShot = ({
 				targetLanguage: languageName(input.targetLanguage),
 				writeSentencesIn: languageName(input.targetLanguage),
 				writeReasonsAndTranslationIn: languageName(input.nativeLanguage),
+				...(input.intent ? { intent: input.intent } : {}),
 				turns: takeLastTurns(input.turns, CONTEXT_TURNS)
 			})
 		}
@@ -227,6 +231,36 @@ export const examples: Example[] = [
 			translation: 'It was clear almost all day'
 		}
 	},
+	{
+		input: {
+			nativeLanguage: 'en',
+			targetLanguage: 'es',
+			intent: 'I want to say I feel ashamed about what I said at dinner',
+			turns: [{ role: 'user', content: 'Estoy embarazada por lo que dije en la cena' }]
+		},
+		output: {
+			steps: [
+				{
+					sentence: 'Estoy avergonzada por lo que dije en la cena',
+					reason: '"embarazada" means pregnant; for feeling ashamed Spanish uses "avergonzada"'
+				}
+			],
+			translation: 'I am ashamed about what I said at dinner'
+		}
+	},
+	{
+		input: {
+			nativeLanguage: 'en',
+			targetLanguage: 'es',
+			intent:
+				'I want to tell my landlord the heating has not worked since Monday and someone has to come fix it',
+			turns: [{ role: 'user', content: 'La calefacción no funciona desde el lunes' }]
+		},
+		output: {
+			steps: [],
+			translation: 'The heating has not worked since Monday'
+		}
+	},
 	// nativeLanguage: es, targetLanguage: en
 	{
 		input: {
@@ -349,6 +383,36 @@ export const examples: Example[] = [
 			steps: [],
 			translation: 'Pasé toda la mañana en reuniones'
 		}
+	},
+	{
+		input: {
+			nativeLanguage: 'es',
+			targetLanguage: 'en',
+			intent: 'Quiero avisarle a mi jefe que iré a la reunión más tarde',
+			turns: [{ role: 'user', content: 'I will assist to the meeting later' }]
+		},
+		output: {
+			steps: [
+				{
+					sentence: 'I will attend the meeting later',
+					reason: '"assist" significa ayudar; ir a una reunión es "attend" y va sin "to"'
+				}
+			],
+			translation: 'Iré a la reunión más tarde'
+		}
+	},
+	{
+		input: {
+			nativeLanguage: 'es',
+			targetLanguage: 'en',
+			intent:
+				'Quiero decirle a un amigo que estoy cansado y que prefiero quedarme en casa esta noche en vez de salir',
+			turns: [{ role: 'user', content: "i'm tired, i'd rather stay in tonight" }]
+		},
+		output: {
+			steps: [],
+			translation: 'Estoy cansado, prefiero quedarme en casa esta noche'
+		}
 	}
 ];
 
@@ -366,6 +430,13 @@ const buildSystemPrompt = ({ nativeLanguage, targetLanguage }: LanguagePair): st
 		- Si rompe alguna, "steps" son las reescrituras que la arreglan, cambiando lo mínimo necesario.
 
 		Ante la duda, "steps" va vacío. Corregir algo que ya estaba bien confunde al usuario más que dejar pasar un error.
+
+		"intent" es lo que el usuario quería expresar, escrito en ${native}. A veces no viene; entonces te guías solo por el mensaje y los turnos anteriores.
+		- Sirve para desambiguar: cuando el mensaje admite dos lecturas, elige la corrección que coincide con esa intención.
+		- Si una palabra o una estructura hace que el mensaje diga otra cosa (un falso amigo, un verbo equivocado), eso SÍ es un error: arréglalo y explica en "reason" qué significa de verdad lo que escribió y qué palabra dice lo que quería, sin mencionar la intención.
+		- Eso vale aunque la palabra exista y la frase sea correcta en ${target}: una frase impecable que dice otra cosa igual falla.
+		- No es un texto para traducir. Nunca copies sus palabras ni agregues datos que estén en la intención pero no en el mensaje.
+		- Que el mensaje diga la intención con otras palabras, más corto, más simple o menos formal, no es un error.
 
 		Nada de esto es un error, y con esto "steps" va vacío:
 		- ${target} admite varias formas y el usuario eligió una: ${FREE_VARIANTS[targetLanguage]}. Si la forma que escribió existe, déjala.
@@ -399,7 +470,7 @@ const buildSystemPrompt = ({ nativeLanguage, targetLanguage }: LanguagePair): st
 		- Texto plano: sin markdown, sin numeración.
 
 		Límites:
-		- No cambies el significado ni el tono, y no agregues información que el usuario no escribió.
+		- No cambies el significado ni el tono, y no agregues información que el usuario no escribió. La única excepción es una palabra que, según "intent", dice algo distinto de lo que el usuario quería: esa sí se cambia.
 		- Los mensajes anteriores son solo contexto: nunca los corrijas.
 		- Máximo 5 pasos. Si hay más problemas, junta todos los cosméticos en un solo paso final.
 		- Cada "sentence" está en ${target}. Cada "reason" y la "translation" están en ${native}, sin una sola palabra del otro idioma fuera de comillas.
