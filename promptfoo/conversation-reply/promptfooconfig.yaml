@@ -9,14 +9,11 @@ prompts:
   - file://prompt.ts
 
 providers:
-  - id: groq:openai/gpt-oss-20b
+  - id: 'openai:{{ env.LLM_MODEL }}'
     config:
-      temperature: 0.5
-      top_p: 1
-      stop: null
       max_completion_tokens: 2048
-      reasoning_effort: 'low'
-      include_reasoning: true
+      reasoning_effort: 'none'
+      temperature: 0.5
 
 tests:
   - description: 'es: first turn, practice for a trip'

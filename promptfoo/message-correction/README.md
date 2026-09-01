@@ -1,10 +1,10 @@
 # Eval: message correction
 
-Runs the prompt in `src/lib/prompts/message-correction.ts` against Groq. The yaml does not duplicate the system prompt: `prompt.ts` calls `buildPrompt` with each test's `vars`.
+Runs the prompt in `src/lib/prompts/message-correction.ts` against OpenAI. The yaml does not duplicate the system prompt: `prompt.ts` calls `buildPrompt` with each test's `vars` and sets the JSON schema.
 
 ## Setup
 
-Set `GROQ_API_KEY` in `.env` (see `.env.example`). Do not put it in the yaml.
+Set `OPENAI_API_KEY` and `LLM_MODEL` in `.env` (see `.env.example`). Do not put them in the yaml.
 
 ## Run
 

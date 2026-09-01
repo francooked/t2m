@@ -29,11 +29,11 @@ npm run dev
 npm run dev -- --open
 ```
 
-Copy `.env.example` to `.env` and set `GROQ_API_KEY` (and the rest). The app and the prompt evals both read that file.
+Copy `.env.example` to `.env` and set `OPENAI_API_KEY` and `LLM_MODEL` (and the rest). The app and the prompt evals both read that file.
 
 ## Prompt evals
 
-Promptfoo runs the real `buildPrompt` from `src/lib/prompts/` against Groq. Cases live next to each prompt under `promptfoo/`.
+Promptfoo runs the real `buildPrompt` from `src/lib/prompts/` against OpenAI. Cases live next to each prompt under `promptfoo/`.
 
 ```sh
 npm run eval:correction
@@ -43,7 +43,7 @@ npm run eval:patterns
 npm run eval:view
 ```
 
-`eval:view` opens the local history for every eval, not just one prompt. Needs `GROQ_API_KEY` in `.env`. Details live next to each prompt under `promptfoo/`.
+`eval:view` opens the local history for every eval, not just one prompt. Needs `OPENAI_API_KEY` and `LLM_MODEL` in `.env`. Details live next to each prompt under `promptfoo/`.
 
 ## Building
 

@@ -5,14 +5,14 @@ import * as schema from '$lib/server/db/schema';
 import { db } from '$lib/server/db';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import z from 'zod';
-import { buildPrompt, outputSchema } from '$lib/prompts/translation-feedback';
+import { buildPrompt, outputSchema, responseFormat } from '$lib/prompts/translation-feedback';
 import { tokenize } from '$lib/correction/tokenize';
 import { diffArrays } from 'diff';
 import { retry } from '$lib/server/retry';
 import { createFormResponders } from '$lib/forms/result.server';
 import { ANSWER_ID, answerFailure, answerSuccess } from '$lib/forms/answer';
 import { parseExercisePayload, toPublicExercisePayload } from '$lib/exercise/parse-exercise';
-import { groq, parseLlmResponse } from '$lib/server/groq';
+import { openai, parseLlmResponse, LLM_MODEL } from '$lib/server/llm';
 import { paramsSchema } from './lib/params';
 
 const answer = createFormResponders({
@@ -175,7 +175,7 @@ export const actions = {
 			try {
 				const llmResponse = await retry({
 					fn: async () => {
-						const chatCompletion = await groq.chat.completions.create({
+						const chatCompletion = await openai.chat.completions.create({
 							messages: buildPrompt({
 								original: exercise.payload.extra,
 								expected: exercise.payload.back,
@@ -183,19 +183,10 @@ export const actions = {
 								nativeLanguage: exercise.nativeLanguage,
 								targetLanguage: exercise.targetLanguage
 							}),
-							model: 'openai/gpt-oss-20b',
-							response_format: {
-								type: 'json_schema',
-								json_schema: {
-									name: 'translation_feedback',
-									strict: false,
-									schema: z.toJSONSchema(outputSchema)
-								}
-							},
-							temperature: 0,
-							max_completion_tokens: 4096,
-							top_p: 1,
-							stop: null
+							model: LLM_MODEL,
+							response_format: responseFormat,
+							reasoning_effort: 'low',
+							max_completion_tokens: 2048
 						});
 
 						return parseLlmResponse(chatCompletion.choices.at(0)?.message.content, outputSchema);

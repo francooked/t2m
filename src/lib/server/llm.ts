@@ -1,8 +1,9 @@
-import { GROQ_API_KEY } from '$env/static/private';
-import Groq from 'groq-sdk';
+import { LLM_MODEL, OPENAI_API_KEY } from '$env/static/private';
+import OpenAI from 'openai';
 import * as z from 'zod';
 
-export const groq = new Groq({ apiKey: GROQ_API_KEY });
+export { LLM_MODEL };
+export const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 /** Unusable model output. `reason` and `content` are for logs; actions map any throw to `unexpected`. */
 export class LlmInvalidResponseError extends Error {

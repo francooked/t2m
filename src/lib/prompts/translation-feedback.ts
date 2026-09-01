@@ -4,8 +4,9 @@ import dedent from 'dedent';
 import type {
 	ChatCompletionAssistantMessageParam,
 	ChatCompletionUserMessageParam,
-	ChatCompletionSystemMessageParam
-} from 'groq-sdk/resources/chat.js';
+	ChatCompletionSystemMessageParam,
+	ResponseFormatJSONSchema
+} from 'openai/resources';
 import { buildLanguageRules, languageName, selectExamples, type LanguagePair } from './utils';
 
 export const inputSchema = z
@@ -173,3 +174,12 @@ export const buildPrompt = (
 	...selectExamples(examples, input).flatMap((example) => buildFewShot(example)),
 	...buildFewShot({ input })
 ];
+
+export const responseFormat: ResponseFormatJSONSchema = {
+	type: 'json_schema' as const,
+	json_schema: {
+		name: 'translation_feedback',
+		strict: false,
+		schema: z.toJSONSchema(outputSchema, { io: 'input' })
+	}
+};

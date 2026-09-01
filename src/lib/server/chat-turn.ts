@@ -1,17 +1,18 @@
 import * as schema from '$lib/server/db/schema';
-import * as z from 'zod';
 import { db } from '$lib/server/db';
 import { eq, and, inArray } from 'drizzle-orm';
 import {
 	buildPrompt as buildMessageReplyPrompt,
-	outputSchema as messageReplyOutputSchema
+	outputSchema as messageReplyOutputSchema,
+	responseFormat as messageReplyResponseFormat
 } from '$lib/prompts/conversation-reply';
 import {
 	buildPrompt as buildMessageCorrectionPrompt,
-	outputSchema as messageCorrectionOutputSchema
+	outputSchema as messageCorrectionOutputSchema,
+	responseFormat as messageCorrectionResponseFormat
 } from '$lib/prompts/message-correction';
 import { retry } from './retry';
-import { groq, parseLlmResponse } from './groq';
+import { openai, parseLlmResponse, LLM_MODEL } from './llm';
 
 /** Operational chat-turn failure. `code` is for logs; actions map any throw to `unexpected`. */
 export class ChatTurnError extends Error {
@@ -125,7 +126,7 @@ async function replyUserMessage({
 
 	const llmResponse = await retry({
 		fn: async () => {
-			const chatCompletion = await groq.chat.completions.create({
+			const chatCompletion = await openai.chat.completions.create({
 				messages: buildMessageReplyPrompt({
 					nativeLanguage: chat.nativeLanguage,
 					targetLanguage: chat.targetLanguage,
@@ -133,19 +134,11 @@ async function replyUserMessage({
 						.filter((message) => message.id <= userMessage.id)
 						.map(({ role, content }) => ({ role, content }))
 				}),
-				model: 'openai/gpt-oss-20b',
-				response_format: {
-					type: 'json_schema',
-					json_schema: {
-						name: 'message_reply',
-						strict: false,
-						schema: z.toJSONSchema(messageReplyOutputSchema)
-					}
-				},
+				model: LLM_MODEL,
+				response_format: messageReplyResponseFormat,
+				reasoning_effort: 'none',
 				temperature: 0.5,
-				max_completion_tokens: 4096,
-				top_p: 1,
-				stop: null
+				max_completion_tokens: 2048
 			});
 
 			return parseLlmResponse(
@@ -185,7 +178,7 @@ async function correctUserMessage({
 
 	const llmResponse = await retry({
 		fn: async () => {
-			const chatCompletion = await groq.chat.completions.create({
+			const chatCompletion = await openai.chat.completions.create({
 				messages: buildMessageCorrectionPrompt({
 					nativeLanguage: chat.nativeLanguage,
 					targetLanguage: chat.targetLanguage,
@@ -193,21 +186,10 @@ async function correctUserMessage({
 						.filter((message) => message.id <= userMessage.id)
 						.map(({ role, content }) => ({ role, content }))
 				}),
-				response_format: {
-					type: 'json_schema',
-					json_schema: {
-						name: 'message_correction',
-						schema: z.toJSONSchema(messageCorrectionOutputSchema, { io: 'input' }),
-						strict: false
-					}
-				},
+				response_format: messageCorrectionResponseFormat,
+				model: LLM_MODEL,
 				reasoning_effort: 'low',
-				model: 'openai/gpt-oss-20b',
-				// Correcting is a deterministic task: sampling only adds inconsistent groupings.
-				temperature: 0,
-				max_completion_tokens: 2048,
-				top_p: 1,
-				stop: null
+				max_completion_tokens: 2048
 			});
 
 			return parseLlmResponse(

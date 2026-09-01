@@ -2,7 +2,6 @@ import { requireUserSession } from '$lib/server/session-user';
 import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import * as z from 'zod';
 import * as schema from '$lib/server/db/schema';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { feedbackPayloadSchema } from '$lib/feedback/feedback-payload';
@@ -10,9 +9,10 @@ import { parseExercisePayload } from '$lib/exercise/parse-exercise';
 import { retry } from '$lib/server/retry';
 import {
 	buildPrompt as buildErrorPatternPrompt,
-	outputSchema as errorPatternsOutputSchema
+	outputSchema as errorPatternsOutputSchema,
+	responseFormat as errorPatternsResponseFormat
 } from '$lib/prompts/error-patterns';
-import { groq, parseLlmResponse } from '$lib/server/groq';
+import { openai, parseLlmResponse, LLM_MODEL } from '$lib/server/llm';
 import { createFormResponders } from '$lib/forms/result.server';
 import {
 	GIVE_FEEDBACK_ID,
@@ -90,25 +90,16 @@ export const actions = {
 				Array.from(mistakesByLanguage).map(([targetLanguage, mistakes]) =>
 					retry({
 						fn: async () => {
-							const chatCompletion = await groq.chat.completions.create({
+							const chatCompletion = await openai.chat.completions.create({
 								messages: buildErrorPatternPrompt({
 									nativeLanguage: signedInUser.nativeLanguage,
 									targetLanguage,
 									mistakes
 								}),
-								response_format: {
-									type: 'json_schema',
-									json_schema: {
-										name: 'error_patterns',
-										schema: z.toJSONSchema(errorPatternsOutputSchema, { io: 'input' }),
-										strict: false
-									}
-								},
-								model: 'openai/gpt-oss-20b',
-								temperature: 0,
-								max_completion_tokens: 4096,
-								top_p: 1,
-								stop: null
+								response_format: errorPatternsResponseFormat,
+								model: LLM_MODEL,
+								reasoning_effort: 'low',
+								max_completion_tokens: 2048
 							});
 
 							return {
